@@ -436,7 +436,7 @@
       events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
       render();
     }).catch(e => {
-      document.getElementById('evList').innerHTML = '<div class="no-ev">아이폰 보안으로 차단되었습니다.<br>사파리 외부 브라우저로 열어주세요.</div>';
+      document.getElementById('evList').innerHTML = '<div class="no-ev">보안으로 차단되었습니다.<br>외부 브라우저로 열어주세요.</div>';
     });
   });
 
