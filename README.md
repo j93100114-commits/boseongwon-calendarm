@@ -1,4 +1,3 @@
-[캘린더.html](https://github.com/user-attachments/files/27464700/default.html)
 <!DOCTYPE html>
 <html lang="ko">
 <head>
