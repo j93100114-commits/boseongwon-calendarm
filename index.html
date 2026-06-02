@@ -9,6 +9,7 @@
 <title>보성원 캘린더</title>
 <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js"></script>
 <style>
   @import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
   * { box-sizing: border-box; margin: 0; padding: 0; }
@@ -450,7 +451,34 @@ function startLive() {
   });
 }
 
-loadData();
+/* ── 익명 로그인 후 데이터 로드 ──
+   보안 규칙(request.auth != null)상 로그인된 상태에서만 캘린더를 읽고 쓸 수 있음.
+   로그인이 끝나기 전에 데이터를 요청하면 "권한 없음"으로 전부 거부되므로,
+   로그인 완료(onAuthStateChanged)를 기다린 뒤 loadData()를 실행한다. */
+let dataLoaded = false;
+function loadOnce() {
+  if (dataLoaded) return;
+  dataLoaded = true;
+  loadData();
+}
+
+if (firebase.auth) {
+  // 로그인 상태가 확정되면(익명 로그인 성공 포함) 데이터 로드
+  firebase.auth().onAuthStateChanged(user => {
+    if (user) loadOnce();
+  });
+  // 익명 로그인 시도
+  firebase.auth().signInAnonymously().catch(err => {
+    console.error('익명 로그인 실패:', err);
+    dot.className = 'sync-dot error';
+    document.getElementById('connBanner').classList.add('show');
+    document.getElementById('evList').innerHTML =
+      '<div class="no-ev">로그인 실패 — 새로고침 해주세요</div>';
+  });
+} else {
+  // auth 모듈이 없으면(예외 상황) 그냥 로드 시도
+  loadOnce();
+}
 
 /* ── iOS 포그라운드 복귀 시 데이터 재동기화 ──
    iOS Safari는 탭 전환·잠금화면 후 네트워크 연결이 끊길 수 있음 */
