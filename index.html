@@ -2,7 +2,10 @@
 <html lang="ko">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="format-detection" content="telephone=no">
 <title>보성원 캘린더</title>
 <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
 <script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
@@ -16,6 +19,8 @@
     --text: #212529; --text-sub: #495057; --text-hint: #adb5bd;
     --titlebar-bg: #e9ecef; --input-bg: #f8f9fa; --input-border: #ced4da;
     --cal-hover: #f1f3f5; --om-text: #dee2e6;
+    /* iOS 뷰포트 높이 변수 (JS에서 갱신) */
+    --real-vh: 1vh;
   }
   [data-theme="dark"] {
     --bg: #1a1a2e; --surface: #16213e; --border: #0f3460;
@@ -39,14 +44,32 @@
     --input-border: #bcccdc; --cal-hover: #f0f4f8; --om-text: #d9e2ec;
   }
 
-  html, body {
+  html {
     font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
-    background: var(--bg); width: 100%; height: 100%; height: 100dvh;
-    overflow: hidden; color: var(--text);
+    /* iOS Safari: -webkit-fill-available 로 주소창 제외한 실제 높이 사용 */
+    height: -webkit-fill-available;
+  }
+  body {
+    font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+    background: var(--bg);
+    width: 100%;
+    height: 100vh; /* fallback */
+    height: -webkit-fill-available; /* iOS Safari */
+    height: calc(var(--real-vh, 1vh) * 100); /* JS로 계산한 정확한 높이 */
+    overflow: hidden;
+    color: var(--text);
   }
   .app-container {
-    background: var(--bg); width: 100%; height: 100%;
-    display: flex; flex-direction: column; overflow: hidden;
+    background: var(--bg);
+    width: 100%;
+    height: 100%;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    /* iOS 노치/홈바 안전영역 */
+    padding-bottom: env(safe-area-inset-bottom);
+    padding-left: env(safe-area-inset-left);
+    padding-right: env(safe-area-inset-right);
   }
 
   /* 타이틀바 */
@@ -54,9 +77,10 @@
     background: var(--titlebar-bg); padding: 12px 16px;
     display: flex; justify-content: space-between; align-items: center;
     border-bottom: 1px solid var(--border); flex-shrink: 0;
+    padding-top: max(12px, env(safe-area-inset-top));
   }
   .titlebar .app-title { font-size: 15px; font-weight: 800; color: var(--accent); display: flex; align-items: center; gap: 8px; }
-  .theme-select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; padding: 6px 8px; outline: none; }
+  .theme-select { background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; font-size: 13px; font-weight: 600; padding: 6px 8px; outline: none; -webkit-appearance: none; appearance: none; }
   .sync-dot { width: 8px; height: 8px; border-radius: 50%; background: #aaa; flex-shrink: 0; }
   .sync-dot.loading { background: #f59f00; animation: blink 1s infinite; }
   .sync-dot.live { background: #1d9e75; animation: blink 2.5s infinite; }
@@ -67,7 +91,9 @@
   .today-banner {
     background: linear-gradient(135deg, var(--accent) 0%, var(--accent-dark) 100%);
     padding: 14px 20px; display: flex; justify-content: space-between;
-    align-items: flex-end; flex-shrink: 0; cursor: pointer;
+    align-items: flex-end; flex-shrink: 0;
+    cursor: pointer;
+    -webkit-tap-highlight-color: transparent;
   }
   .today-banner:active { opacity: 0.9; }
   .day-big { font-size: 38px; font-weight: 900; line-height: 1; color: #fff; }
@@ -78,26 +104,24 @@
 
   /* 팀 필터 */
   .filter-bar { display: flex; gap: 6px; padding: 8px 16px; background: var(--surface); border-bottom: 1px solid var(--border); flex-wrap: wrap; flex-shrink: 0; }
-  .chip { font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 20px; border: 1px solid transparent; cursor: pointer; opacity: 0.35; transition: all 0.2s; }
+  .chip { font-size: 12px; font-weight: 700; padding: 5px 10px; border-radius: 20px; border: 1px solid transparent; cursor: pointer; opacity: 0.35; transition: all 0.2s; -webkit-tap-highlight-color: transparent; }
   .chip.on { opacity: 1; transform: translateY(-1px); }
   .c-식 { background: rgba(233,69,96,.15); color: #e94560; border-color: #e94560; }
   .c-행 { background: rgba(55,138,221,.15); color: #378add; border-color: #378add; }
   .c-재 { background: rgba(29,158,117,.15); color: #1d9e75; border-color: #1d9e75; }
   .c-의 { background: rgba(216,90,48,.15); color: #d85a30; border-color: #d85a30; }
 
-  /* ── 캘린더 (드래그로 접기) ── */
+  /* ── 캘린더 ── */
   .mini-cal-wrapper {
     background: var(--surface); border-bottom: 1px solid var(--border);
     flex-shrink: 0; display: flex; flex-direction: column;
-    transition: none;
   }
   .cal-header { padding: 8px 16px 0; }
   .cal-nav { display: flex; justify-content: space-between; align-items: center; margin-bottom: 6px; }
   .cal-nav .lbl { font-size: 14px; font-weight: 800; color: var(--text); }
-  .arrow-btn { background: none; border: none; color: var(--text-hint); cursor: pointer; font-size: 14px; padding: 4px 12px; border-radius: 6px; }
+  .arrow-btn { background: none; border: none; color: var(--text-hint); cursor: pointer; font-size: 14px; padding: 4px 12px; border-radius: 6px; -webkit-tap-highlight-color: transparent; }
   .arrow-btn:active { background: var(--border); }
 
-  /* 캘린더 그리드 - 높이 애니메이션 */
   .cal-body {
     overflow: hidden;
     height: 220px;
@@ -107,7 +131,7 @@
 
   .cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; padding: 0 16px 8px; }
   .cal-grid .hd { text-align: center; font-size: 11px; font-weight: 800; color: var(--text-hint); padding: 2px 0 5px; }
-  .cal-grid .dc { text-align: center; font-size: 13px; font-weight: 700; padding: 6px 1px; border-radius: 8px; cursor: pointer; color: var(--text-sub); position: relative; line-height: 1; }
+  .cal-grid .dc { text-align: center; font-size: 13px; font-weight: 700; padding: 6px 1px; border-radius: 8px; cursor: pointer; color: var(--text-sub); position: relative; line-height: 1; -webkit-tap-highlight-color: transparent; }
   .cal-grid .dc:active:not(.om) { background: var(--cal-hover); }
   .cal-grid .dc.om { color: var(--om-text); cursor: default; font-weight: 500; }
   .cal-grid .dc.today { background: var(--accent); color: #fff; font-weight: 900; }
@@ -122,20 +146,26 @@
     width: 100%; padding: 10px 0; display: flex; flex-direction: column;
     justify-content: center; align-items: center; gap: 4px;
     cursor: pointer; background: var(--surface);
-    touch-action: none; user-select: none; -webkit-user-select: none;
+    touch-action: pan-y; /* iOS: 수직 스와이프 허용 */
+    user-select: none; -webkit-user-select: none;
     border-top: 1px solid var(--border);
+    -webkit-tap-highlight-color: transparent;
   }
   .drag-handle:active { background: var(--cal-hover); }
   .handle-bar { width: 36px; height: 4px; background: var(--border); border-radius: 10px; }
   .handle-hint { font-size: 10px; color: var(--text-hint); font-weight: 600; }
 
   /* 이벤트 목록 */
-  .ev-section { flex: 1; overflow-y: auto; -webkit-overflow-scrolling: touch; padding: 12px 16px; min-height: 0; }
+  .ev-section {
+    flex: 1; overflow-y: auto; overflow-x: hidden;
+    -webkit-overflow-scrolling: touch; /* iOS 관성 스크롤 */
+    padding: 12px 16px; min-height: 0;
+  }
   .ev-section::-webkit-scrollbar { width: 4px; }
   .ev-section::-webkit-scrollbar-thumb { background: var(--border); border-radius: 4px; }
   .ev-label { font-size: 12px; font-weight: 800; color: var(--text-hint); letter-spacing: 0.5px; margin-bottom: 10px; }
 
-  .ev-card { display: flex; gap: 10px; align-items: flex-start; padding: 14px 12px; border-radius: 12px; margin-bottom: 10px; cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid transparent; box-shadow: 0 1px 4px rgba(0,0,0,0.04); }
+  .ev-card { display: flex; gap: 10px; align-items: flex-start; padding: 14px 12px; border-radius: 12px; margin-bottom: 10px; cursor: pointer; background: var(--surface); border: 1px solid var(--border); border-left: 4px solid transparent; box-shadow: 0 1px 4px rgba(0,0,0,0.04); -webkit-tap-highlight-color: transparent; }
   .ev-card:active { opacity: 0.7; transform: translateY(1px); }
   .ev-dot { width: 9px; height: 9px; border-radius: 50%; flex-shrink: 0; margin-top: 5px; }
   .ev-body { flex: 1; min-width: 0; display: flex; flex-direction: column; gap: 5px; }
@@ -160,26 +190,38 @@
   .quick-section { background: var(--surface); border-top: 1px solid var(--border); padding: 12px 16px; flex-shrink: 0; }
   .quick-header { display: flex; justify-content: space-between; align-items: center; }
   .quick-lbl { font-size: 12px; font-weight: 800; color: var(--text-hint); letter-spacing: .4px; }
-  .add-btn { background: var(--accent); border: none; color: #fff; font-size: 20px; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 900; line-height: 1; }
+  .add-btn { background: var(--accent); border: none; color: #fff; font-size: 20px; width: 30px; height: 30px; border-radius: 8px; cursor: pointer; display: flex; align-items: center; justify-content: center; font-weight: 900; line-height: 1; -webkit-tap-highlight-color: transparent; }
   .qform { margin-top: 10px; display: none; }
   .qform.open { display: block; }
   .fr { display: flex; gap: 8px; margin-bottom: 8px; flex-wrap: wrap; }
-  .qform input, .qform select, .qform textarea { background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; color: var(--text); font-family: inherit; font-size: 16px; padding: 10px; outline: none; flex: 1; min-width: 0; font-weight: 600; }
+  /* iOS: font-size 16px 미만이면 자동 확대됨 → 16px 고정 */
+  .qform input, .qform select, .qform textarea {
+    background: var(--input-bg); border: 1px solid var(--input-border);
+    border-radius: 8px; color: var(--text); font-family: inherit;
+    font-size: 16px; padding: 10px; outline: none; flex: 1; min-width: 0;
+    font-weight: 600;
+    -webkit-appearance: none; appearance: none; /* iOS select 기본 스타일 제거 */
+  }
   .qform textarea { resize: none; height: 60px; line-height: 1.5; }
-  .btn-ok { flex: 2; background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 800; padding: 10px; cursor: pointer; }
-  .btn-no { flex: 1; background: var(--border); border: none; border-radius: 8px; color: var(--text-sub); font-size: 14px; font-weight: 700; padding: 10px; cursor: pointer; }
+  .btn-ok { flex: 2; background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 800; padding: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .btn-no { flex: 1; background: var(--border); border: none; border-radius: 8px; color: var(--text-sub); font-size: 14px; font-weight: 700; padding: 10px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   /* 수정 모달 */
-  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px; }
+  .overlay { position: fixed; inset: 0; background: rgba(0,0,0,0.6); z-index: 999; display: none; align-items: center; justify-content: center; padding: 20px; padding-bottom: max(20px, env(safe-area-inset-bottom)); }
   .overlay.open { display: flex; }
-  .mbox { background: var(--surface); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); }
+  .mbox { background: var(--surface); border-radius: 16px; padding: 20px; width: 100%; max-width: 400px; box-shadow: 0 10px 30px rgba(0,0,0,0.2); max-height: 90vh; overflow-y: auto; -webkit-overflow-scrolling: touch; }
   .m-ttl { font-size: 16px; font-weight: 800; color: var(--accent); margin-bottom: 12px; border-bottom: 2px dashed var(--border); padding-bottom: 10px; }
-  .mbox input, .mbox select, .mbox textarea { width: 100%; background: var(--input-bg); border: 1px solid var(--input-border); border-radius: 8px; font-size: 16px; font-family: inherit; font-weight: 600; padding: 10px; margin-bottom: 8px; outline: none; color: var(--text); }
+  .mbox input, .mbox select, .mbox textarea {
+    width: 100%; background: var(--input-bg); border: 1px solid var(--input-border);
+    border-radius: 8px; font-size: 16px; font-family: inherit; font-weight: 600;
+    padding: 10px; margin-bottom: 8px; outline: none; color: var(--text);
+    -webkit-appearance: none; appearance: none;
+  }
   .mbox textarea { resize: none; height: 70px; line-height: 1.5; }
   .mbtns { display: flex; gap: 8px; margin-top: 8px; }
-  .mb-save { flex: 2; background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 800; padding: 12px; cursor: pointer; }
-  .mb-del { flex: 1; background: #fff0f3; border: 1px solid #ffc9c9; border-radius: 8px; color: #e03131; font-size: 14px; font-weight: 800; padding: 12px; cursor: pointer; }
-  .mb-cancel { flex: 1; background: var(--border); border: none; border-radius: 8px; color: var(--text-sub); font-size: 14px; font-weight: 700; padding: 12px; cursor: pointer; }
+  .mb-save { flex: 2; background: var(--accent); border: none; border-radius: 8px; color: #fff; font-size: 14px; font-weight: 800; padding: 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .mb-del { flex: 1; background: #fff0f3; border: 1px solid #ffc9c9; border-radius: 8px; color: #e03131; font-size: 14px; font-weight: 800; padding: 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
+  .mb-cancel { flex: 1; background: var(--border); border: none; border-radius: 8px; color: var(--text-sub); font-size: 14px; font-weight: 700; padding: 12px; cursor: pointer; -webkit-tap-highlight-color: transparent; }
 
   /* 연결 실패 배너 */
   .conn-banner { display: none; background: #fff3cd; border-bottom: 1px solid #ffc107; padding: 8px 16px; font-size: 12px; font-weight: 700; color: #856404; text-align: center; flex-shrink: 0; }
@@ -235,7 +277,6 @@
         <div class="hd">수</div><div class="hd">목</div><div class="hd">금</div><div class="hd">토</div>
       </div>
     </div>
-    <!-- 드래그/탭 핸들 -->
     <div class="drag-handle" id="dragHandle">
       <div class="handle-bar"></div>
       <div class="handle-hint" id="handleHint">▲ 위로 당기면 캘린더 접힘</div>
@@ -255,7 +296,7 @@
     <div class="qform" id="qform">
       <div class="fr">
         <input type="date" id="qDate">
-        <input type="text" id="qTime" placeholder="시간 (예: 14:00~)">
+        <input type="text" id="qTime" placeholder="시간 (예: 14:00~)" inputmode="text" autocomplete="off">
       </div>
       <div class="fr">
         <select id="qTeam">
@@ -264,12 +305,12 @@
           <option value="기획행정팀">🏢 기획행정팀</option>
           <option value="의료재활팀">⚕ 의료재활팀</option>
         </select>
-        <input type="text" id="qTarget" placeholder="대상자">
+        <input type="text" id="qTarget" placeholder="대상자" autocomplete="off">
       </div>
       <div class="fr"><textarea id="qText" placeholder="일정 내용을 입력하세요..."></textarea></div>
       <div class="fr">
-        <input type="text" id="qAuthor" placeholder="기록자 성함">
-        <input type="password" id="qPw" placeholder="비밀번호">
+        <input type="text" id="qAuthor" placeholder="기록자 성함" autocomplete="name">
+        <input type="password" id="qPw" placeholder="비밀번호" autocomplete="off">
       </div>
       <div class="fr">
         <button class="btn-no" onclick="toggleForm()">취소</button>
@@ -284,17 +325,17 @@
     <div class="m-ttl">📝 일정 수정 / 삭제</div>
     <input type="hidden" id="eid">
     <input type="date" id="mDate">
-    <input type="text" id="mTime" placeholder="시간">
+    <input type="text" id="mTime" placeholder="시간" autocomplete="off">
     <select id="mTeam">
       <option value="생활재활팀">🏡 생활재활팀</option>
       <option value="영양급식팀">🍽 영양급식팀</option>
       <option value="기획행정팀">🏢 기획행정팀</option>
       <option value="의료재활팀">⚕ 의료재활팀</option>
     </select>
-    <input type="text" id="mTarget" placeholder="대상자">
+    <input type="text" id="mTarget" placeholder="대상자" autocomplete="off">
     <textarea id="mText" placeholder="일정 내용"></textarea>
-    <input type="text" id="mAuthor" placeholder="기록자">
-    <input type="password" id="mPw" placeholder="수정/삭제 비밀번호">
+    <input type="text" id="mAuthor" placeholder="기록자" autocomplete="name">
+    <input type="password" id="mPw" placeholder="수정/삭제 비밀번호" autocomplete="off">
     <div class="mbtns">
       <button class="mb-cancel" onclick="closeModal()">닫기</button>
       <button class="mb-del" onclick="delEvent()">삭제</button>
@@ -304,13 +345,27 @@
 </div>
 
 <script>
+/* ── iOS 뷰포트 높이 보정 ──
+   iOS Safari는 주소창 높이가 동적으로 바뀌어 100vh가 맞지 않음.
+   실제 window.innerHeight를 CSS 변수로 넘겨 정확한 높이 계산 */
+function setRealVH() {
+  const vh = window.innerHeight * 0.01;
+  document.documentElement.style.setProperty('--real-vh', `${vh}px`);
+}
+setRealVH();
+// 주소창 나타남/숨김, 화면 회전 시 재계산
+window.addEventListener('resize', setRealVH, { passive: true });
+window.addEventListener('orientationchange', () => {
+  setTimeout(setRealVH, 200); // 회전 애니메이션 후 재계산
+}, { passive: true });
+
 /* ── 테마 ── */
 function changeTheme(t) { document.documentElement.setAttribute('data-theme', t); localStorage.setItem('widget_theme', t); }
 const savedTheme = localStorage.getItem('widget_theme') || 'light';
 document.getElementById('themeSelect').value = savedTheme;
 changeTheme(savedTheme);
 
-/* ── Firebase: 아이폰 호환 설정 ── */
+/* ── Firebase 초기화 ── */
 firebase.initializeApp({
   apiKey: "AIzaSyDL3rxK3prYGyxGhR8zb4Xh81T42A8nsLM",
   authDomain: "inbody-c3a41.firebaseapp.com",
@@ -321,7 +376,7 @@ firebase.initializeApp({
 });
 const db = firebase.firestore();
 
-// ✅ 아이폰 핵심: 롱폴링 강제, 웹소켓 끔
+// iOS Safari 핵심 설정: 롱폴링 강제 (WebSocket 차단 우회)
 db.settings({
   experimentalForceLongPolling: true,
   experimentalAutoDetectLongPolling: false,
@@ -339,6 +394,8 @@ let events = [];
 let filters = new Set(['영양급식팀','기획행정팀','생활재활팀','의료재활팀']);
 let formOpen = false;
 let calCollapsed = false;
+let liveUnsubscribe = null;
+let loadRetryTimer = null;
 
 function fmt(d) {
   return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
@@ -346,47 +403,66 @@ function fmt(d) {
 const WD = ['일','월','화','수','목','금','토'];
 const CODE = {'영양급식팀':'식','기획행정팀':'행','생활재활팀':'재','의료재활팀':'의'};
 
-/* ── 데이터 로드: 서버 직접 fetch → 실시간 구독 순서 ── */
+/* ── 데이터 로드 ── */
 const dot = document.getElementById('syncDot');
 
-// 1단계: 서버에서 즉시 1회 가져오기 (캐시 무시)
-col.get({ source: 'server' })
-  .then(snap => {
-    events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-    dot.className = 'sync-dot error'; // 1회 로드, 아직 실시간 아님
-    render();
-    // 2단계: 실시간 구독 시작
-    startLive();
-  })
-  .catch(() => {
-    // 서버 실패 → 캐시 시도
-    col.get({ source: 'cache' })
-      .then(snap => {
-        events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-        dot.className = 'sync-dot error';
-        render();
-        startLive();
-      })
-      .catch(() => {
-        // 완전 실패
-        dot.className = 'sync-dot error';
-        document.getElementById('connBanner').classList.add('show');
-        document.getElementById('evList').innerHTML = '<div class="no-ev">데이터 로드 실패<br>Safari로 열어주세요</div>';
-        render();
-      });
-  });
+function loadData() {
+  // 서버에서 직접 1회 가져오기
+  col.get({ source: 'server' })
+    .then(snap => {
+      events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+      dot.className = 'sync-dot error';
+      render();
+      startLive();
+    })
+    .catch(() => {
+      // 서버 실패 → 캐시 시도
+      col.get({ source: 'cache' })
+        .then(snap => {
+          events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+          dot.className = 'sync-dot error';
+          render();
+          startLive();
+        })
+        .catch(() => {
+          dot.className = 'sync-dot error';
+          document.getElementById('connBanner').classList.add('show');
+          document.getElementById('evList').innerHTML =
+            '<div class="no-ev">데이터 로드 실패<br>Safari로 열어주세요</div>';
+          render();
+          // 10초 후 자동 재시도
+          loadRetryTimer = setTimeout(loadData, 10000);
+        });
+    });
+}
 
 function startLive() {
-  col.onSnapshot(snap => {
+  if (liveUnsubscribe) liveUnsubscribe(); // 중복 구독 방지
+  liveUnsubscribe = col.onSnapshot(snap => {
     events = snap.docs.map(d => ({ id: d.id, ...d.data() }));
     dot.className = 'sync-dot live';
     document.getElementById('connBanner').classList.remove('show');
+    if (loadRetryTimer) { clearTimeout(loadRetryTimer); loadRetryTimer = null; }
     render();
   }, () => {
     dot.className = 'sync-dot error';
-    // 실시간 끊겨도 1회 로드 데이터로 계속 동작
+    // 실시간 끊겨도 기존 데이터로 계속 동작
   });
 }
+
+loadData();
+
+/* ── iOS 포그라운드 복귀 시 데이터 재동기화 ──
+   iOS Safari는 탭 전환·잠금화면 후 네트워크 연결이 끊길 수 있음 */
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    // 실시간 연결 상태 확인 — error 상태면 재시도
+    if (dot.className.includes('error')) {
+      if (loadRetryTimer) clearTimeout(loadRetryTimer);
+      loadData();
+    }
+  }
+});
 
 /* ── 렌더 ── */
 function render() { renderBanner(); renderCal(); renderEvents(); }
@@ -460,23 +536,27 @@ function toggleCal() {
   handleHint.textContent = calCollapsed ? '▼ 아래로 당기면 캘린더 펼침' : '▲ 위로 당기면 캘린더 접힘';
 }
 
-// 탭으로 토글
 dragHandle.addEventListener('click', toggleCal);
 
-// 터치 드래그로 접기/펼치기
 let touchStartY = 0;
+let touchMoved = false;
 dragHandle.addEventListener('touchstart', e => {
   touchStartY = e.touches[0].clientY;
+  touchMoved = false;
+}, { passive: true });
+
+dragHandle.addEventListener('touchmove', () => {
+  touchMoved = true;
 }, { passive: true });
 
 dragHandle.addEventListener('touchend', e => {
+  if (!touchMoved) return; // 탭은 click이 처리
   const diff = e.changedTouches[0].clientY - touchStartY;
-  if (Math.abs(diff) < 5) return; // 탭은 click이 처리
-  if (diff < -20 && !calCollapsed) toggleCal();  // 위로 스와이프 → 접기
-  if (diff > 20 && calCollapsed) toggleCal();    // 아래로 스와이프 → 펼치기
+  if (diff < -20 && !calCollapsed) toggleCal();
+  if (diff > 20 && calCollapsed) toggleCal();
 }, { passive: true });
 
-/* 날짜/월 */
+/* ── 날짜/월 ── */
 function pickDate(ds) { selDate = ds; renderCal(); renderEvents(); document.getElementById('qDate').value = ds; }
 function goToday() { cur = new Date(today); pickDate(fmt(today)); }
 function moveMonth(v) { cur.setMonth(cur.getMonth() + v); renderCal(); }
@@ -486,7 +566,7 @@ function toggleFilter(chip) {
   chip.classList.toggle('on'); render();
 }
 
-/* 등록 폼 */
+/* ── 등록 폼 ── */
 function toggleForm() {
   formOpen = !formOpen;
   document.getElementById('qform').classList.toggle('open', formOpen);
@@ -511,13 +591,10 @@ function quickSave() {
   }).then(() => {
     ['qText','qTime','qTarget','qAuthor','qPw'].forEach(id => document.getElementById(id).value = '');
     toggleForm();
-    if (dot.className.includes('error')) {
-      col.get({ source: 'server' }).then(snap => { events = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }).catch(() => {});
-    }
   }).catch(() => alert('저장 실패. 인터넷 연결을 확인해주세요.'));
 }
 
-/* 수정/삭제 모달 */
+/* ── 수정/삭제 모달 ── */
 function openEdit(id) {
   const ev = events.find(e => e.id === id); if (!ev) return;
   document.getElementById('eid').value = id;
@@ -532,13 +609,20 @@ function openEdit(id) {
 }
 function closeModal() { document.getElementById('modal').classList.remove('open'); }
 
+// 모달 배경 탭으로 닫기
+document.getElementById('modal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
 async function saveEdit() {
   const id = document.getElementById('eid').value;
   const pw = document.getElementById('mPw').value;
   if (!pw) return alert('비밀번호를 입력해주세요.');
   if (pw !== MASTER) {
-    const doc = await col.doc(id).get({ source: 'server' }).catch(() => col.doc(id).get());
-    if (doc.data().pw !== pw) return alert('비밀번호가 맞지 않습니다.');
+    try {
+      const doc = await col.doc(id).get({ source: 'server' }).catch(() => col.doc(id).get());
+      if (doc.data().pw !== pw) return alert('비밀번호가 맞지 않습니다.');
+    } catch { return alert('비밀번호 확인 실패.'); }
   }
   col.doc(id).update({
     date: document.getElementById('mDate').value,
@@ -547,10 +631,8 @@ async function saveEdit() {
     target: document.getElementById('mTarget').value,
     text: document.getElementById('mText').value,
     author: document.getElementById('mAuthor').value, pw
-  }).then(() => {
-    closeModal();
-    if (dot.className.includes('error')) col.get({ source: 'server' }).then(snap => { events = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }).catch(() => {});
-  }).catch(() => alert('저장 실패.'));
+  }).then(() => closeModal())
+    .catch(() => alert('저장 실패.'));
 }
 
 async function delEvent() {
@@ -558,18 +640,19 @@ async function delEvent() {
   const pw = document.getElementById('mPw').value;
   if (!pw) return alert('비밀번호를 입력해주세요.');
   if (pw !== MASTER) {
-    const doc = await col.doc(id).get({ source: 'server' }).catch(() => col.doc(id).get());
-    if (doc.data().pw !== pw) return alert('비밀번호가 맞지 않습니다.');
+    try {
+      const doc = await col.doc(id).get({ source: 'server' }).catch(() => col.doc(id).get());
+      if (doc.data().pw !== pw) return alert('비밀번호가 맞지 않습니다.');
+    } catch { return alert('비밀번호 확인 실패.'); }
   }
   if (confirm('삭제하시겠습니까?')) {
-    col.doc(id).delete().then(() => {
-      closeModal();
-      if (dot.className.includes('error')) col.get({ source: 'server' }).then(snap => { events = snap.docs.map(d => ({ id: d.id, ...d.data() })); render(); }).catch(() => {});
-    }).catch(() => alert('삭제 실패.'));
+    col.doc(id).delete()
+      .then(() => closeModal())
+      .catch(() => alert('삭제 실패.'));
   }
 }
 
-/* 초기화 */
+/* ── 초기화 ── */
 document.getElementById('qDate').value = fmt(today);
 render();
 </script>
