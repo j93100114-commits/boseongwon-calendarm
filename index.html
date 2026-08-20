@@ -1,0 +1,1814 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>📦 재고관리</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>📦</text></svg>">
+
+<!-- 📱 홈 화면에 앱으로 추가되기 위한 것들 (https 주소에서만 동작합니다) -->
+<link rel="manifest" href="manifest.json">
+<meta name="theme-color" content="#ff8e8b">
+<meta name="mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="default">
+<meta name="apple-mobile-web-app-title" content="재고관리">
+<link rel="apple-touch-icon" href="apple-touch-icon.png">
+<style>
+@import url('https://cdn.jsdelivr.net/gh/orioncactus/pretendard/dist/web/static/pretendard.css');
+
+/* =========================================================================== */
+/* ================== [START: 기본 변수 · 리셋] ================== */
+/* =========================================================================== */
+:root{
+    --primary:   #ff8e8b;
+    --secondary: #e64980;
+    --bg:        #f4f7f6;
+    --success:   #20c997;
+    --info:      #4263eb;
+    --warning:   #ffa94d;
+    --danger:    #e24b4a;
+    --line:      #e9ecef;
+    --text:      #343a40;
+    --muted:     #868e96;
+    --card-shadow: 0 4px 15px rgba(0,0,0,.05);
+    --radius:    18px;
+}
+*, *::before, *::after{ box-sizing: border-box; }
+html, body{ margin:0; padding:0; }
+body{
+    background: var(--bg);
+    color: var(--text);
+    font-family: 'Pretendard', 'Malgun Gothic', sans-serif;
+    font-weight: 500;
+    -webkit-text-size-adjust: 100%;
+}
+button, input, select, textarea{ font-family: inherit; font-size: inherit; color: inherit; }
+button{ cursor: pointer; }
+.container{ max-width: 1280px; margin: 0 auto; padding: 0 20px 60px; }
+.hidden{ display: none !important; }
+/* ================== [END: 기본 변수 · 리셋] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 헤더 · 탭] ================== */
+/* =========================================================================== */
+.app-header{
+    background:#fff;
+    border-bottom:1px solid var(--line);
+    position: sticky; top:0; z-index: 100;
+}
+.app-header .inner{
+    max-width:1280px; margin:0 auto; padding:14px 20px;
+    display:flex; align-items:center; gap:14px; flex-wrap:wrap;
+}
+.app-title{
+    font-size:22px; font-weight:800; color:var(--secondary);
+    margin:0; letter-spacing:-.4px; white-space:nowrap;
+}
+.conn-badge{
+    font-size:12px; font-weight:700; padding:6px 12px; border-radius:999px;
+    background:#f1f3f5; color:var(--muted); white-space:nowrap;
+}
+.conn-badge.cloud{ background:#e6fcf5; color:#0ca678; }
+.conn-badge.local{ background:#fff4e6; color:#e8590c; }
+.conn-badge.error{ background:#fff5f5; color:var(--danger); }
+.header-spacer{ flex:1 1 auto; min-width:0; }
+
+.tab-menu{
+    display:flex; gap:8px; flex-wrap:wrap;
+    max-width:1280px; margin:0 auto; padding:0 20px 12px;
+}
+.tab-btn{
+    border:1px solid var(--line); background:#fff; color:var(--muted);
+    font-weight:800; font-size:15px; padding:10px 20px; border-radius:999px;
+    transition: all .15s; min-height:44px;
+}
+.tab-btn:hover{ border-color:var(--primary); color:var(--secondary); }
+.tab-btn.active{
+    background:var(--primary); border-color:var(--primary); color:#fff;
+    box-shadow:0 4px 12px rgba(255,142,139,.35);
+}
+/* ================== [END: 헤더 · 탭] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 카드 · 공통 부품] ================== */
+/* =========================================================================== */
+.card{
+    background:#fff; border:1px solid var(--line); border-radius:var(--radius);
+    box-shadow:var(--card-shadow); padding:20px;
+}
+.section-title{
+    font-size:17px; font-weight:800; margin:0 0 14px; color:var(--text);
+    display:flex; align-items:center; gap:8px;
+}
+.btn{
+    border:none; border-radius:12px; padding:11px 18px; font-weight:800; font-size:15px;
+    background:#f1f3f5; color:var(--text); transition:filter .15s, transform .05s;
+    min-height:44px; white-space:nowrap;
+}
+.btn:hover{ filter:brightness(.96); }
+.btn:active{ transform:translateY(1px); }
+.btn:disabled{ opacity:.5; cursor:not-allowed; }
+.btn-primary{ background:var(--primary); color:#fff; }
+.btn-success{ background:var(--success); color:#fff; }
+.btn-info{ background:var(--info); color:#fff; }
+.btn-danger{ background:var(--danger); color:#fff; }
+.btn-ghost{ background:#fff; border:1px solid var(--line); }
+.btn-sm{ padding:8px 14px; font-size:14px; min-height:36px; border-radius:10px; }
+.empty-msg{
+    text-align:center; color:var(--muted); font-weight:600;
+    padding:60px 20px; line-height:1.7;
+}
+.empty-msg .big{ font-size:40px; display:block; margin-bottom:12px; }
+/* ================== [END: 카드 · 공통 부품] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 통계 바] ================== */
+/* =========================================================================== */
+.stat-grid{
+    display:grid; grid-template-columns:repeat(auto-fit, minmax(160px,1fr));
+    gap:12px; margin:18px 0;
+}
+.stat-tile{
+    background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:14px 16px; box-shadow:var(--card-shadow); min-width:0;
+}
+.stat-tile .label{
+    font-size:12px; font-weight:700; color:var(--muted);
+    display:flex; align-items:center; gap:5px; margin-bottom:6px;
+}
+.stat-tile .value{
+    font-size:21px; font-weight:800; letter-spacing:-.5px;
+    white-space:nowrap; overflow:hidden; text-overflow:ellipsis;
+}
+.stat-tile .sub{ font-size:12px; font-weight:600; color:var(--muted); margin-top:3px; }
+.v-plus{ color:var(--success); }
+.v-minus{ color:var(--danger); }
+.v-info{ color:var(--info); }
+.v-warn{ color:#e8590c; }
+
+.basis-row{
+    display:flex; align-items:center; gap:8px; flex-wrap:wrap;
+    font-size:13px; font-weight:700; color:var(--muted); margin:-4px 0 16px;
+}
+.chip{
+    border:1px solid var(--line); background:#fff; border-radius:999px;
+    padding:6px 14px; font-size:13px; font-weight:700; color:var(--muted);
+    min-height:34px;
+}
+.chip.on{ background:var(--secondary); border-color:var(--secondary); color:#fff; }
+/* ================== [END: 통계 바] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 툴바 (검색 · 정렬 · 필터)] ================== */
+/* =========================================================================== */
+.toolbar{
+    display:flex; gap:10px; flex-wrap:wrap; align-items:center;
+    background:#fff; border:1px solid var(--line); border-radius:14px;
+    padding:12px 14px; box-shadow:var(--card-shadow); margin-bottom:18px;
+}
+.search-wrap{ position:relative; flex:1 1 260px; min-width:0; }
+.search-wrap .ico{
+    position:absolute; left:14px; top:50%; transform:translateY(-50%);
+    font-size:15px; pointer-events:none;
+}
+.search-wrap input{
+    width:100%; border:1px solid var(--line); border-radius:12px;
+    padding:11px 14px 11px 40px; font-weight:600; outline:none; min-height:44px;
+    background:#fff;
+}
+.search-wrap input:focus{ border-color:var(--primary); }
+.toolbar select{
+    border:1px solid var(--line); border-radius:12px; padding:11px 14px;
+    font-weight:700; background:#fff; outline:none; min-height:44px;
+}
+.toolbar select:focus{ border-color:var(--primary); }
+.filter-chips{ display:flex; gap:6px; }
+.count-label{ font-size:13px; font-weight:700; color:var(--muted); margin-left:auto; white-space:nowrap; }
+/* ================== [END: 툴바] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 제품 카드 격자] ================== */
+/* =========================================================================== */
+.item-grid{
+    display:grid; grid-template-columns:repeat(auto-fill, minmax(250px,1fr)); gap:16px;
+}
+.item-card{
+    background:#fff; border:1px solid var(--line); border-radius:16px;
+    box-shadow:var(--card-shadow); overflow:hidden; cursor:pointer;
+    transition: transform .12s, box-shadow .12s; min-width:0;
+    display:flex; flex-direction:column;
+}
+.item-card:hover{ transform:translateY(-3px); box-shadow:0 10px 24px rgba(0,0,0,.09); }
+.item-photo{
+    position:relative; width:100%; aspect-ratio:4/3; background:#f1f3f5;
+    display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.item-photo img{ width:100%; height:100%; object-fit:cover; display:block; }
+.item-photo .noimg{ font-size:38px; opacity:.35; }
+.stock-badge{
+    position:absolute; top:10px; right:10px;
+    padding:5px 11px; border-radius:999px; font-size:12px; font-weight:800;
+    /* ⚠️ backdrop-filter 를 쓰지 말 것 — 안드로이드 일부 브라우저에서 이 딱지의 흰 글자가 사라진다 */
+    background:rgba(32,201,151,.96); color:#fff;
+    text-shadow:0 1px 2px rgba(0,0,0,.18);
+}
+.stock-badge.out{ background:rgba(226,75,74,.94); }
+.item-body{ padding:14px 16px 16px; display:flex; flex-direction:column; gap:8px; flex:1; min-width:0; }
+.item-name{
+    font-size:16px; font-weight:800; line-height:1.35; word-break:keep-all;
+    display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
+}
+.price-main{ font-size:20px; font-weight:800; color:var(--secondary); letter-spacing:-.5px; }
+.price-sub{ font-size:12.5px; font-weight:600; color:var(--muted); display:flex; gap:8px; flex-wrap:wrap; }
+.price-sub .strike{ text-decoration:line-through; }
+.margin-line{
+    font-size:13px; font-weight:800; padding:7px 10px; border-radius:10px;
+    background:#f8f9fa; display:flex; justify-content:space-between; gap:8px;
+}
+.item-meta{
+    font-size:12px; font-weight:600; color:var(--muted);
+    display:flex; justify-content:space-between; gap:8px; margin-top:auto; padding-top:2px;
+}
+/* ================== [END: 제품 카드 격자] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 등록 폼] ================== */
+/* =========================================================================== */
+.form-wrap{ max-width:840px; margin:0 auto; }
+.form-grid{ display:grid; grid-template-columns:repeat(auto-fit, minmax(220px,1fr)); gap:16px; }
+.field{ display:flex; flex-direction:column; gap:6px; min-width:0; }
+.field label{ font-size:13.5px; font-weight:800; color:var(--text); }
+.field label .opt{ font-weight:600; color:var(--muted); font-size:12px; }
+.field input, .field textarea{
+    border:1px solid var(--line); border-radius:12px; padding:12px 14px;
+    font-weight:600; outline:none; background:#fff; min-height:46px; width:100%;
+}
+.field input:focus, .field textarea:focus{ border-color:var(--primary); }
+.field textarea{ resize:none; overflow:hidden; min-height:70px; line-height:1.55; }
+.field .hint{ font-size:12px; font-weight:700; color:var(--info); min-height:16px; }
+.field .hint.warn{ color:var(--danger); }
+
+.photo-box{
+    border:2px dashed #dee2e6; border-radius:16px; background:#fff;
+    padding:16px; text-align:center; margin-bottom:20px;
+}
+.photo-box.drag{ border-color:var(--primary); background:#fff5f5; }
+.photo-preview{
+    width:100%; max-width:380px; aspect-ratio:4/3; margin:0 auto 14px;
+    border-radius:12px; background:#f1f3f5; overflow:hidden;
+    display:flex; align-items:center; justify-content:center;
+}
+.photo-preview img{ width:100%; height:100%; object-fit:contain; }
+.photo-preview .ph{ color:var(--muted); font-weight:700; font-size:14px; line-height:1.8; }
+.photo-preview .ph .big{ font-size:40px; display:block; }
+.photo-btns{ display:flex; gap:8px; justify-content:center; flex-wrap:wrap; }
+.photo-size{ font-size:12px; font-weight:700; color:var(--muted); margin-top:10px; min-height:16px; }
+.form-actions{ display:flex; gap:10px; justify-content:flex-end; margin-top:22px; flex-wrap:wrap; }
+/* ================== [END: 등록 폼] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 판매 이력 표] ================== */
+/* =========================================================================== */
+.tbl{ width:100%; border-collapse:collapse; font-size:14.5px; }
+.tbl th{
+    text-align:left; font-size:13px; font-weight:800; color:var(--muted);
+    padding:10px 12px; border-bottom:2px solid var(--line); white-space:nowrap;
+}
+.tbl td{
+    padding:12px; border-bottom:1px solid var(--line); font-weight:600;
+    word-break:keep-all;
+}
+.tbl tr:last-child td{ border-bottom:none; }
+.tbl .num{ text-align:right; white-space:nowrap; }
+.tbl-scroll{ overflow-x:auto; }
+/* ================== [END: 판매 이력 표] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 모달] ================== */
+/* =========================================================================== */
+.modal-back{
+    position:fixed; inset:0; background:rgba(0,0,0,.45); z-index:500;
+    display:flex; align-items:center; justify-content:center; padding:20px;
+    overflow-y:auto;
+}
+.modal{
+    background:#fff; border-radius:20px; width:100%; max-width:620px;
+    max-height:90vh; overflow-y:auto; box-shadow:0 20px 50px rgba(0,0,0,.25);
+    animation: pop .16s ease-out;
+}
+@keyframes pop{ from{ transform:scale(.97); opacity:0; } to{ transform:scale(1); opacity:1; } }
+.modal-head{
+    display:flex; align-items:center; gap:10px; padding:18px 22px;
+    border-bottom:1px solid var(--line); position:sticky; top:0; background:#fff; border-radius:20px 20px 0 0;
+}
+.modal-head h3{ margin:0; font-size:18px; font-weight:800; flex:1; min-width:0; word-break:keep-all; }
+.modal-close{
+    border:none; background:#f1f3f5; width:34px; height:34px; border-radius:10px;
+    font-size:17px; font-weight:800; color:var(--muted); flex:none;
+}
+.modal-body{ padding:22px; }
+.modal-foot{ display:flex; gap:8px; padding:0 22px 22px; flex-wrap:wrap; }
+.modal-foot .btn{ flex:1 1 auto; }
+
+.detail-photo{
+    width:100%; border-radius:14px; background:#f1f3f5; margin-bottom:18px;
+    aspect-ratio:4/3; display:flex; align-items:center; justify-content:center; overflow:hidden;
+}
+.detail-photo img{ width:100%; height:100%; object-fit:contain; }
+.detail-photo .ph{ font-size:44px; opacity:.35; }
+.kv{ display:flex; justify-content:space-between; gap:12px; padding:11px 0; border-bottom:1px solid var(--line); }
+.kv:last-child{ border-bottom:none; }
+.kv .k{ font-size:14px; font-weight:700; color:var(--muted); white-space:nowrap; }
+.kv .v{ font-size:15px; font-weight:800; text-align:right; word-break:keep-all; }
+.kv .v.big{ font-size:19px; color:var(--secondary); }
+/* ================== [END: 모달] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 토스트 · 로딩] ================== */
+/* =========================================================================== */
+#toastBox{
+    position:fixed; left:50%; bottom:32px; transform:translateX(-50%);
+    z-index:900; display:flex; flex-direction:column; gap:8px; align-items:center;
+    pointer-events:none; width:calc(100% - 40px); max-width:440px;
+}
+.toast{
+    background:rgba(52,58,64,.95); color:#fff; font-weight:700; font-size:14.5px;
+    padding:13px 22px; border-radius:14px; box-shadow:0 8px 22px rgba(0,0,0,.22);
+    animation: toastIn .2s ease-out; word-break:keep-all; text-align:center;
+}
+.toast.ok{ background:rgba(32,201,151,.96); }
+.toast.err{ background:rgba(226,75,74,.96); }
+@keyframes toastIn{ from{ transform:translateY(14px); opacity:0; } to{ transform:translateY(0); opacity:1; } }
+
+#loadingVeil{
+    position:fixed; inset:0; background:rgba(255,255,255,.72); z-index:800;
+    display:flex; align-items:center; justify-content:center; flex-direction:column; gap:14px;
+    font-weight:800; color:var(--secondary);
+}
+.spinner{
+    width:38px; height:38px; border:4px solid #ffe3e3; border-top-color:var(--primary);
+    border-radius:50%; animation: spin .8s linear infinite;
+}
+@keyframes spin{ to{ transform:rotate(360deg); } }
+
+.setup-note{
+    background:#fff9db; border:1px solid #ffe066; border-radius:14px;
+    padding:16px 18px; font-size:14px; font-weight:600; line-height:1.75; margin-bottom:18px;
+}
+.setup-note b{ font-weight:800; }
+.setup-note code{
+    background:#fff; border:1px solid var(--line); border-radius:6px;
+    padding:1px 6px; font-size:13px; font-family:'Pretendard', monospace;
+}
+/* ================== [END: 토스트 · 로딩] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 반응형 (휴대폰)] ================== */
+/* =========================================================================== */
+@media (max-width: 768px){
+    .container{ padding:0 14px 50px; }
+    .app-header .inner{ padding:12px 14px; gap:10px; }
+    .app-title{ font-size:19px; }
+    .tab-menu{ padding:0 14px 10px; gap:6px; }
+    .tab-btn{ padding:9px 15px; font-size:14px; flex:1 1 auto; }
+    .stat-grid{ grid-template-columns:repeat(2, 1fr); gap:10px; margin:14px 0; }
+    .stat-tile{ padding:12px 13px; border-radius:14px; }
+    .stat-tile .value{ font-size:18px; }
+    .item-grid{ grid-template-columns:repeat(auto-fill, minmax(150px,1fr)); gap:12px; }
+    .item-name{ font-size:15px; }
+    .price-main{ font-size:18px; }
+    .card{ padding:16px; border-radius:16px; }
+    .count-label{ margin-left:0; width:100%; }
+    .modal{ border-radius:18px 18px 0 0; max-height:94vh; }
+    .modal-back{ align-items:flex-end; padding:0; }
+    .modal-head{ border-radius:18px 18px 0 0; }
+    .form-grid{ grid-template-columns:1fr; }
+}
+/* ================== [END: 반응형 (휴대폰)] ================== */
+</style>
+</head>
+<body>
+
+<!-- =================== 헤더 =================== -->
+<header class="app-header">
+    <div class="inner">
+        <h1 class="app-title">📦 재고관리</h1>
+        <span class="conn-badge" id="connBadge">연결 확인 중…</span>
+        <span class="header-spacer"></span>
+        <button class="btn btn-ghost btn-sm" id="refreshBtn" title="다른 기기에서 바꾼 내용을 다시 불러옵니다">🔄 새로고침</button>
+    </div>
+    <nav class="tab-menu">
+        <button class="tab-btn active" data-tab="list">📦 재고 목록</button>
+        <button class="tab-btn" data-tab="form">➕ 제품 등록</button>
+        <button class="tab-btn" data-tab="sales">💰 판매 이력</button>
+        <button class="tab-btn" data-tab="setting">⚙️ 설정</button>
+    </nav>
+</header>
+
+<main class="container">
+
+    <!-- =================== 재고 목록 =================== -->
+    <section id="tab-list">
+        <div id="setupNote" class="setup-note hidden"></div>
+
+        <div class="stat-grid" id="statGrid"></div>
+        <div class="basis-row">
+            <span>💡 수익 계산 원가 기준</span>
+            <button class="chip" data-basis="auctionPrice">🔨 경매가격</button>
+            <button class="chip" data-basis="originalPrice">🏷️ 원래가격</button>
+        </div>
+
+        <div class="toolbar">
+            <div class="search-wrap">
+                <span class="ico">🔍</span>
+                <input type="text" id="searchInput" placeholder="제품 이름으로 검색…" autocomplete="off">
+            </div>
+            <select id="sortSelect">
+                <option value="inDate_desc">📅 입고 최신순</option>
+                <option value="inDate_asc">📅 입고 오래된순</option>
+                <option value="name_asc">🔤 이름순</option>
+                <option value="salePrice_desc">💵 실판매가 높은순</option>
+                <option value="salePrice_asc">💵 실판매가 낮은순</option>
+                <option value="qty_desc">📦 재고 많은순</option>
+                <option value="margin_desc">📈 마진 높은순</option>
+            </select>
+            <div class="filter-chips">
+                <button class="chip on" data-filter="all">전체</button>
+                <button class="chip" data-filter="instock">재고 있음</button>
+                <button class="chip" data-filter="sold">품절</button>
+            </div>
+            <span class="count-label" id="countLabel"></span>
+        </div>
+
+        <div class="item-grid" id="itemGrid"></div>
+        <div class="empty-msg hidden" id="listEmpty">
+            <span class="big">📭</span>
+            등록된 제품이 없습니다.<br>위의 <b>➕ 제품 등록</b> 탭에서 첫 제품을 올려보세요.
+        </div>
+    </section>
+
+    <!-- =================== 제품 등록 =================== -->
+    <section id="tab-form" class="hidden">
+        <div class="form-wrap">
+            <div class="card">
+                <h2 class="section-title" id="formTitle">➕ 새 제품 등록</h2>
+
+                <!-- 사진 -->
+                <div class="photo-box" id="photoBox">
+                    <div class="photo-preview" id="photoPreview">
+                        <div class="ph"><span class="big">📷</span>제품 사진을 올려주세요<br><span style="font-size:12px">(선택 사항 · 여기로 끌어다 놓아도 됩니다)</span></div>
+                    </div>
+                    <div class="photo-btns">
+                        <button type="button" class="btn btn-primary btn-sm" id="captureBtn">📷 카메라로 촬영</button>
+                        <button type="button" class="btn btn-ghost btn-sm" id="pickBtn">🖼️ 사진 선택</button>
+                        <button type="button" class="btn btn-ghost btn-sm hidden" id="photoClearBtn">🗑️ 사진 지우기</button>
+                    </div>
+                    <div class="photo-size" id="photoSize"></div>
+                    <input type="file" id="captureInput" accept="image/*" capture="environment" class="hidden">
+                    <input type="file" id="pickInput" accept="image/*" class="hidden">
+                </div>
+
+                <!-- 입력 항목 -->
+                <div class="field" style="margin-bottom:16px">
+                    <label for="fName">🏷️ 제품 이름</label>
+                    <input type="text" id="fName" placeholder="예) 나이키 에어포스1 화이트 270" maxlength="80" autocomplete="off">
+                    <div class="hint" id="hName"></div>
+                </div>
+
+                <div class="form-grid">
+                    <div class="field">
+                        <label for="fSale">💵 실판매가 <span class="opt">(실제로 파는 값)</span></label>
+                        <input type="number" id="fSale" min="0" step="1" inputmode="numeric" placeholder="0">
+                        <div class="hint" id="hSale"></div>
+                    </div>
+                    <div class="field">
+                        <label for="fOriginal">🏷️ 원래가격 <span class="opt">(정가)</span></label>
+                        <input type="number" id="fOriginal" min="0" step="1" inputmode="numeric" placeholder="0">
+                        <div class="hint" id="hOriginal"></div>
+                    </div>
+                    <div class="field">
+                        <label for="fAuction">🔨 경매가격 <span class="opt">(낙찰받은 값)</span></label>
+                        <input type="number" id="fAuction" min="0" step="1" inputmode="numeric" placeholder="0">
+                        <div class="hint" id="hAuction"></div>
+                    </div>
+                    <div class="field">
+                        <label for="fQty">📦 개수</label>
+                        <input type="number" id="fQty" min="0" step="1" inputmode="numeric" placeholder="1">
+                        <div class="hint" id="hQty"></div>
+                    </div>
+                    <div class="field">
+                        <label for="fDate">📅 입고날짜</label>
+                        <input type="date" id="fDate">
+                        <div class="hint"></div>
+                    </div>
+                </div>
+
+                <div class="field" style="margin-top:4px">
+                    <label for="fMemo">📝 메모 <span class="opt">(선택)</span></label>
+                    <textarea id="fMemo" rows="2" placeholder="상태, 보관 위치, 특이사항 등"></textarea>
+                </div>
+
+                <div class="form-actions">
+                    <button class="btn btn-ghost" id="formResetBtn">↩️ 새로 쓰기</button>
+                    <button class="btn btn-primary" id="formSaveBtn">💾 저장하기</button>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <!-- =================== 판매 이력 =================== -->
+    <section id="tab-sales" class="hidden">
+        <div class="stat-grid" id="salesStatGrid"></div>
+        <div class="card">
+            <h2 class="section-title">💰 판매 이력</h2>
+            <div class="tbl-scroll">
+                <table class="tbl" id="salesTable">
+                    <thead>
+                        <tr>
+                            <th>판매일</th>
+                            <th>제품</th>
+                            <th class="num">수량</th>
+                            <th class="num">판매단가</th>
+                            <th class="num">매출</th>
+                            <th class="num">수익</th>
+                            <th></th>
+                        </tr>
+                    </thead>
+                    <tbody id="salesBody"></tbody>
+                </table>
+            </div>
+            <div class="empty-msg hidden" id="salesEmpty">
+                <span class="big">🧾</span>
+                아직 판매 기록이 없습니다.<br>재고 목록에서 제품을 눌러 <b>판매 완료</b>를 눌러보세요.
+            </div>
+        </div>
+    </section>
+
+    <!-- =================== 설정 =================== -->
+    <section id="tab-setting" class="hidden">
+        <div class="form-wrap">
+            <div class="card" style="margin-bottom:18px">
+                <h2 class="section-title">🔌 연결 상태</h2>
+                <div id="settingConn"></div>
+            </div>
+
+            <div class="card" style="margin-bottom:18px">
+                <h2 class="section-title">📈 수익 계산 기준</h2>
+                <p style="font-size:14px; font-weight:600; color:var(--muted); line-height:1.75; margin:0 0 14px">
+                    수익 = <b>실판매가 − 원가</b> 로 계산합니다. 아래에서 <b>무엇을 원가로 볼지</b> 고르세요.<br>
+                    보통 경매로 물건을 받아오면 <b>경매가격</b>이 원가입니다.
+                </p>
+                <div class="basis-row" style="margin:0">
+                    <button class="chip" data-basis="auctionPrice">🔨 경매가격을 원가로</button>
+                    <button class="chip" data-basis="originalPrice">🏷️ 원래가격을 원가로</button>
+                </div>
+                <p style="font-size:13px; font-weight:600; color:var(--muted); margin:14px 0 0">
+                    ※ 이미 저장된 판매 이력의 수익은 <b>팔던 그 시점의 원가</b>로 굳어 있어 바뀌지 않습니다.
+                </p>
+            </div>
+
+            <div class="card">
+                <h2 class="section-title">🛠️ Firebase 연결하기</h2>
+                <div style="font-size:14px; font-weight:600; line-height:1.85">
+                    기존 프로젝트 <b>jangggimaster</b> 를 같이 씁니다. <b>세 줄만 채우면 끝</b>입니다.<br><br>
+                    <b>1.</b> <a href="https://console.firebase.google.com/u/0/project/jangggimaster/settings/general" target="_blank" rel="noopener" style="color:var(--info); font-weight:800">프로젝트 설정 → 일반</a> 을 열고 맨 아래 <b>내 앱</b> 칸을 봅니다.<br>
+                    <b>2.</b> 웹 앱(<code>&lt;/&gt;</code>)이 없으면 <b>앱 추가 → 웹</b> 으로 하나 만듭니다. (닉네임만 적으면 됩니다)<br>
+                    <b>3.</b> <b>SDK 설정 및 구성 → 구성</b> 에 나오는 <code>apiKey</code> · <code>messagingSenderId</code> · <code>appId</code> 를 복사합니다.<br>
+                    <b>4.</b> 이 폴더의 <code>config.js</code> 를 열어 그 세 줄에 붙여넣고 저장 → 새로고침.<br><br>
+                    <b>규칙(Rules)은 손댈 것이 없습니다.</b> 지금 규칙이 모든 문서를 허용하고 있어
+                    이 앱이 쓰는 <code>inventory_items</code> · <code>inventory_photos</code> · <code>inventory_sales</code> 도
+                    그대로 됩니다. 기존 데이터와 이름이 겹치지 않으니 섞이지도 않습니다.<br><br>
+                    자세한 설명은 폴더 안의 <code>README.md</code> 에 있습니다.
+                </div>
+            </div>
+        </div>
+    </section>
+
+</main>
+
+<div id="toastBox"></div>
+<div id="modalRoot"></div>
+<div id="loadingVeil" class="hidden"><div class="spinner"></div><span id="loadingText">불러오는 중…</span></div>
+
+<!-- Firebase SDK (보성원 프로젝트와 같은 compat 버전)
+     ⚠️ 로그인(auth) SDK 는 여기서 안 받는다. config.js 의 USE_ANON_AUTH 가 true 일 때만
+        Store.init() 이 그때 받아 온다 — 안 쓰는데 매번 받으면 그만큼 느려지기 때문. -->
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.8.1/firebase-firestore-compat.js"></script>
+<script src="config.js"></script>
+<script>
+/* =========================================================================== */
+/* ================== [START: 공통 유틸] ================== */
+/* =========================================================================== */
+
+/** 화면에 남의 글자를 넣을 때 반드시 거른다 (XSS 방지) */
+function esc(s){
+    return String(s == null ? '' : s)
+        .replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;')
+        .replace(/"/g,'&quot;').replace(/'/g,'&#39;');
+}
+
+/** 딱딱한 alert() 대신 쓰는 부드러운 알림창 */
+function showToast(msg, type){
+    var box = document.getElementById('toastBox');
+    var el = document.createElement('div');
+    el.className = 'toast' + (type ? ' ' + type : '');
+    el.textContent = msg;
+    box.appendChild(el);
+    setTimeout(function(){
+        el.style.transition = 'opacity .25s';
+        el.style.opacity = '0';
+        setTimeout(function(){ el.remove(); }, 260);
+    }, 2400);
+}
+
+function showLoading(text){
+    document.getElementById('loadingText').textContent = text || '불러오는 중…';
+    document.getElementById('loadingVeil').classList.remove('hidden');
+}
+function hideLoading(){
+    document.getElementById('loadingVeil').classList.add('hidden');
+}
+
+/** 1234567 → "1,234,567원" */
+function won(n){
+    var v = Number(n) || 0;
+    return v.toLocaleString('ko-KR') + '원';
+}
+/** 부호를 붙여서 (+1,000원 / -500원) */
+function wonSigned(n){
+    var v = Number(n) || 0;
+    return (v > 0 ? '+' : '') + v.toLocaleString('ko-KR') + '원';
+}
+function num(n){ return (Number(n) || 0).toLocaleString('ko-KR'); }
+
+/** 오늘 날짜 YYYY-MM-DD — 반드시 한국시간(=이 컴퓨터 시간) 기준으로 만든다.
+ *  toISOString() 은 UTC 라서 오전에 하루가 밀린다. */
+function todayStr(d){
+    var t = d || new Date();
+    var y = t.getFullYear();
+    var m = String(t.getMonth() + 1).padStart(2, '0');
+    var day = String(t.getDate()).padStart(2, '0');
+    return y + '-' + m + '-' + day;
+}
+/** "2026-08-21" → "26.08.21" */
+function shortDate(s){
+    if(!s || s.length < 10) return s || '-';
+    return s.slice(2, 4) + '.' + s.slice(5, 7) + '.' + s.slice(8, 10);
+}
+
+function newId(){
+    return Date.now().toString(36) + Math.random().toString(36).slice(2, 8);
+}
+
+/** base64 데이터URL 의 대략적인 원본 바이트 수 */
+function dataUrlBytes(dataUrl){
+    if(!dataUrl) return 0;
+    var i = dataUrl.indexOf(',');
+    var b64 = i >= 0 ? dataUrl.slice(i + 1) : dataUrl;
+    return Math.round(b64.length * 3 / 4);
+}
+function kb(bytes){
+    if(bytes < 1024) return bytes + 'B';
+    if(bytes < 1024 * 1024) return Math.round(bytes / 1024) + 'KB';
+    return (bytes / 1024 / 1024).toFixed(1) + 'MB';
+}
+
+/** textarea 자동 높이 조절 */
+function autoResize(el){
+    el.style.height = 'auto';
+    el.style.height = el.scrollHeight + 'px';
+}
+/* ================== [END: 공통 유틸] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 이미지 압축] ================== */
+/* =========================================================================== */
+
+/** 폰 사진은 EXIF 로 방향이 돌아가 있는 경우가 많다.
+ *  createImageBitmap 의 imageOrientation:'from-image' 가 그것을 바로잡아 준다.
+ *  (지원하지 않는 브라우저는 <img> 로 떨어진다) */
+function loadBitmap(file){
+    if(window.createImageBitmap){
+        return createImageBitmap(file, { imageOrientation: 'from-image' })
+            .catch(function(){ return loadViaImg(file); });
+    }
+    return loadViaImg(file);
+}
+function loadViaImg(file){
+    return new Promise(function(resolve, reject){
+        var reader = new FileReader();
+        reader.onload = function(){
+            var img = new Image();
+            img.onload = function(){ resolve(img); };
+            img.onerror = function(){ reject(new Error('이미지를 읽을 수 없습니다')); };
+            img.src = reader.result;
+        };
+        reader.onerror = function(){ reject(new Error('파일을 읽을 수 없습니다')); };
+        reader.readAsDataURL(file);
+    });
+}
+
+/** 긴 변을 maxSide 로 줄이고 JPEG 로 다시 뽑는다 */
+function drawToJpeg(src, maxSide, quality){
+    var w = src.width, h = src.height;
+    if(w >= h){
+        if(w > maxSide){ h = Math.round(h * maxSide / w); w = maxSide; }
+    }else{
+        if(h > maxSide){ w = Math.round(w * maxSide / h); h = maxSide; }
+    }
+    var c = document.createElement('canvas');
+    c.width = w; c.height = h;
+    var ctx = c.getContext('2d');
+    ctx.fillStyle = '#ffffff';          // 투명 PNG 가 검게 나오는 것을 막는다
+    ctx.fillRect(0, 0, w, h);
+    ctx.drawImage(src, 0, 0, w, h);
+    return c.toDataURL('image/jpeg', quality);
+}
+
+/** 원본용 · 목록용 두 장을 한 번에 만든다 */
+function makePhotoPair(file){
+    return loadBitmap(file).then(function(src){
+        var full  = drawToJpeg(src, PHOTO_MAX_SIDE, PHOTO_QUALITY);
+        var thumb = drawToJpeg(src, THUMB_MAX_SIDE, THUMB_QUALITY);
+        if(src.close) src.close();
+        return { full: full, thumb: thumb };
+    });
+}
+/* ================== [END: 이미지 압축] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 로컬 저장소 (IndexedDB)] ================== */
+/* =========================================================================== */
+/*  Firebase 설정이 비어 있을 때 쓰는 대비책.
+ *  이 브라우저 안에만 저장되므로 다른 기기에서는 보이지 않는다.            */
+
+var LocalDB = (function(){
+    var dbp = null;
+    function open(){
+        if(dbp) return dbp;
+        dbp = new Promise(function(resolve, reject){
+            var req = indexedDB.open('inventory_local', 1);
+            req.onupgradeneeded = function(e){
+                var db = e.target.result;
+                if(!db.objectStoreNames.contains('items'))  db.createObjectStore('items',  { keyPath: 'id' });
+                if(!db.objectStoreNames.contains('photos')) db.createObjectStore('photos', { keyPath: 'id' });
+                if(!db.objectStoreNames.contains('sales'))  db.createObjectStore('sales',  { keyPath: 'id' });
+            };
+            req.onsuccess = function(){ resolve(req.result); };
+            req.onerror   = function(){ reject(req.error); };
+        });
+        return dbp;
+    }
+    function run(store, mode, fn){
+        return open().then(function(db){
+            return new Promise(function(resolve, reject){
+                var tx = db.transaction(store, mode);
+                var req = fn(tx.objectStore(store));
+                req.onsuccess = function(){ resolve(req.result); };
+                req.onerror   = function(){ reject(req.error); };
+            });
+        });
+    }
+    return {
+        all: function(store){ return run(store, 'readonly',  function(s){ return s.getAll(); }); },
+        get: function(store, id){ return run(store, 'readonly',  function(s){ return s.get(id); }); },
+        put: function(store, val){ return run(store, 'readwrite', function(s){ return s.put(val); }); },
+        del: function(store, id){ return run(store, 'readwrite', function(s){ return s.delete(id); }); }
+    };
+})();
+/* ================== [END: 로컬 저장소] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 저장소 어댑터] ================== */
+/* =========================================================================== */
+/*  화면 코드는 이 Store 만 부른다. 클라우드냐 로컬이냐는 여기서 감춘다.     */
+
+var Store = {
+    mode: 'local',      // 'cloud' | 'local'
+    error: '',
+    db: null,
+
+    /** 필요할 때만 로그인 SDK 를 받아 온다 (USE_ANON_AUTH 가 true 일 때만 불린다) */
+    loadAuthSdk: function(){
+        if(window.firebase && firebase.auth) return Promise.resolve();
+        return new Promise(function(resolve, reject){
+            var s = document.createElement('script');
+            s.src = 'https://www.gstatic.com/firebasejs/10.8.1/firebase-auth-compat.js';
+            s.onload = function(){ resolve(); };
+            s.onerror = function(){ reject(new Error('로그인 SDK 를 받지 못했습니다 (인터넷 확인)')); };
+            document.head.appendChild(s);
+        });
+    },
+
+    init: function(){
+        var self = this;
+        var cfgOk = firebaseConfig && firebaseConfig.projectId && firebaseConfig.apiKey;
+        if(!cfgOk){
+            self.mode = 'local';
+            return Promise.resolve();
+        }
+        // 파이어베이스 연결 — 실패해도 앱이 죽지 않도록 방어적으로 감싼다
+        try{
+            firebase.initializeApp(firebaseConfig);
+            self.db = firebase.firestore();
+            // 오프라인 캐시: 다시 접속했을 때 바뀐 것만 받아와 읽기 요금을 아낀다.
+            // ⚠️ 다른 Firestore 작업보다 먼저 불러야 한다. 자리를 옮기지 말 것.
+            self.db.enablePersistence({ synchronizeTabs: true }).catch(function(){ /* 여러 탭이면 무시 */ });
+        }catch(e){
+            self.mode = 'local';
+            self.error = 'Firebase 초기화 실패: ' + (e && e.message ? e.message : e);
+            console.error('[재고관리] Firebase 초기화 실패', e);
+            return Promise.resolve();
+        }
+
+        // 규칙이 열려 있으면(USE_ANON_AUTH=false) 로그인 없이 곧바로 쓴다
+        if(typeof USE_ANON_AUTH === 'undefined' || !USE_ANON_AUTH){
+            self.mode = 'cloud';
+            return Promise.resolve();
+        }
+
+        // 규칙을 잠갔을 때만 익명 로그인을 한다
+        return self.loadAuthSdk()
+            .then(function(){ return firebase.auth().signInAnonymously(); })
+            .then(function(){ self.mode = 'cloud'; })
+            .catch(function(e){
+                self.mode = 'local';
+                self.error = (e && e.code === 'auth/operation-not-allowed')
+                    ? '익명 로그인이 꺼져 있습니다. Firebase 콘솔 → Authentication → 시작하기 → 익명 을 켜거나, config.js 의 USE_ANON_AUTH 를 false 로 되돌리세요.'
+                    : ('로그인 실패: ' + (e && e.message ? e.message : e));
+                console.error('[재고관리] 익명 로그인 실패', e);
+            });
+    },
+
+    /* ---------- 제품 ---------- */
+    listItems: function(){
+        var self = this;
+        if(self.mode !== 'cloud'){
+            return LocalDB.all('items');
+        }
+        return self.db.collection(COL_ITEMS)
+            .orderBy('createdAt', 'desc').limit(LOAD_LIMIT_ITEMS).get()
+            .then(function(snap){
+                var out = [];
+                snap.forEach(function(d){
+                    var v = d.data(); v.id = d.id; out.push(v);
+                });
+                return out;
+            });
+    },
+    /** ⚠️ 일부 항목만 넘겨도 되도록 항상 '합치기(merge)' 로 저장한다.
+     *  (판매 처리는 { id, qty } 만 넘긴다 — 통째로 덮어쓰면 이름·가격이 날아간다) */
+    saveItem: function(item){
+        if(this.mode !== 'cloud'){
+            return LocalDB.get('items', item.id).then(function(prev){
+                return LocalDB.put('items', Object.assign({}, prev || {}, item));
+            });
+        }
+        return this.db.collection(COL_ITEMS).doc(item.id).set(item, { merge: true });
+    },
+    deleteItem: function(id){
+        if(this.mode !== 'cloud') return LocalDB.del('items', id);
+        return this.db.collection(COL_ITEMS).doc(id).delete();
+    },
+
+    /* ---------- 원본 사진 (상세보기를 눌렀을 때만 읽는다) ---------- */
+    getPhoto: function(id){
+        if(this.mode !== 'cloud'){
+            return LocalDB.get('photos', id).then(function(r){ return r ? r.data : ''; });
+        }
+        return this.db.collection(COL_PHOTOS).doc(id).get().then(function(d){
+            return d.exists ? (d.data().data || '') : '';
+        });
+    },
+    savePhoto: function(id, dataUrl){
+        if(this.mode !== 'cloud') return LocalDB.put('photos', { id: id, data: dataUrl });
+        return this.db.collection(COL_PHOTOS).doc(id).set({ data: dataUrl });
+    },
+    deletePhoto: function(id){
+        if(this.mode !== 'cloud'){
+            return LocalDB.del('photos', id);
+        }
+        return this.db.collection(COL_PHOTOS).doc(id).delete().catch(function(){ /* 없으면 그만 */ });
+    },
+
+    /* ---------- 판매 이력 ---------- */
+    listSales: function(){
+        var self = this;
+        if(self.mode !== 'cloud') return LocalDB.all('sales');
+        return self.db.collection(COL_SALES)
+            .orderBy('createdAt', 'desc').limit(LOAD_LIMIT_SALES).get()
+            .then(function(snap){
+                var out = [];
+                snap.forEach(function(d){
+                    var v = d.data(); v.id = d.id; out.push(v);
+                });
+                return out;
+            });
+    },
+    addSale: function(sale){
+        if(this.mode !== 'cloud') return LocalDB.put('sales', sale);
+        return this.db.collection(COL_SALES).doc(sale.id).set(sale);
+    },
+    deleteSale: function(id){
+        if(this.mode !== 'cloud') return LocalDB.del('sales', id);
+        return this.db.collection(COL_SALES).doc(id).delete();
+    }
+};
+/* ================== [END: 저장소 어댑터] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 앱 상태] ================== */
+/* =========================================================================== */
+var state = {
+    items: [],
+    sales: [],
+    search: '',
+    sort: 'inDate_desc',
+    filter: 'all',
+    costBasis: localStorage.getItem('inv_costBasis') || 'auctionPrice',
+    editingId: null,
+    photoFull: null,     // 등록 폼에 물려 있는 원본 사진
+    photoThumb: null,
+    photoTouched: false  // 수정 중에 사진을 새로 골랐는지
+};
+
+/** 그 제품의 원가 (설정에서 고른 기준) */
+function costOf(item){ return Number(item[state.costBasis]) || 0; }
+/** 한 개 팔았을 때의 마진 */
+function marginOf(item){ return (Number(item.salePrice) || 0) - costOf(item); }
+/** 수익률 (%) */
+function marginRate(item){
+    var c = costOf(item);
+    if(!c) return null;
+    return marginOf(item) / c * 100;
+}
+/* ================== [END: 앱 상태] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 통계 계산] ================== */
+/* =========================================================================== */
+function calcStats(){
+    var totalQty = 0, stockCost = 0, stockValue = 0, outCount = 0;
+    state.items.forEach(function(it){
+        var q = Number(it.qty) || 0;
+        totalQty += q;
+        stockCost  += q * costOf(it);
+        stockValue += q * (Number(it.salePrice) || 0);
+        if(q <= 0) outCount++;
+    });
+    var revenue = 0, profit = 0, soldQty = 0;
+    state.sales.forEach(function(s){
+        var q = Number(s.qty) || 0;
+        soldQty += q;
+        revenue += q * (Number(s.unitPrice) || 0);
+        profit  += q * ((Number(s.unitPrice) || 0) - (Number(s.unitCost) || 0));
+    });
+    return {
+        itemCount: state.items.length,
+        outCount: outCount,
+        totalQty: totalQty,
+        stockCost: stockCost,
+        stockValue: stockValue,
+        expected: stockValue - stockCost,
+        revenue: revenue,
+        profit: profit,
+        soldQty: soldQty
+    };
+}
+
+function renderStats(){
+    var s = calcStats();
+    var basisName = state.costBasis === 'auctionPrice' ? '경매가격' : '원래가격';
+    var tiles = [
+        { label: '📦 등록 품목',   value: num(s.itemCount) + '종', sub: '품절 ' + num(s.outCount) + '종' },
+        { label: '🔢 총 재고 수량', value: num(s.totalQty) + '개', sub: '' },
+        { label: '🔨 재고 매입액',  value: won(s.stockCost),  sub: basisName + ' 기준', cls: 'v-warn' },
+        { label: '💵 재고 예상매출', value: won(s.stockValue), sub: '실판매가 기준', cls: 'v-info' },
+        { label: '📈 예상 수익',    value: wonSigned(s.expected), sub: '다 팔았을 때', cls: s.expected >= 0 ? 'v-plus' : 'v-minus' },
+        { label: '🏆 실현 수익',    value: wonSigned(s.profit), sub: '판매 ' + num(s.soldQty) + '개 · 매출 ' + won(s.revenue), cls: s.profit >= 0 ? 'v-plus' : 'v-minus' }
+    ];
+    document.getElementById('statGrid').innerHTML = tiles.map(function(t){
+        return '<div class="stat-tile">'
+             +   '<div class="label">' + esc(t.label) + '</div>'
+             +   '<div class="value ' + (t.cls || '') + '">' + esc(t.value) + '</div>'
+             +   (t.sub ? '<div class="sub">' + esc(t.sub) + '</div>' : '')
+             + '</div>';
+    }).join('');
+
+    // 판매 이력 탭 상단 통계
+    var avg = s.soldQty ? Math.round(s.profit / s.soldQty) : 0;
+    var salesTiles = [
+        { label: '🧾 판매 건수', value: num(state.sales.length) + '건', sub: '총 ' + num(s.soldQty) + '개' },
+        { label: '💰 총 매출',   value: won(s.revenue), sub: '', cls: 'v-info' },
+        { label: '🏆 총 수익',   value: wonSigned(s.profit), sub: '', cls: s.profit >= 0 ? 'v-plus' : 'v-minus' },
+        { label: '📊 개당 평균 수익', value: wonSigned(avg), sub: '', cls: avg >= 0 ? 'v-plus' : 'v-minus' }
+    ];
+    document.getElementById('salesStatGrid').innerHTML = salesTiles.map(function(t){
+        return '<div class="stat-tile">'
+             +   '<div class="label">' + esc(t.label) + '</div>'
+             +   '<div class="value ' + (t.cls || '') + '">' + esc(t.value) + '</div>'
+             +   (t.sub ? '<div class="sub">' + esc(t.sub) + '</div>' : '')
+             + '</div>';
+    }).join('');
+}
+/* ================== [END: 통계 계산] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 재고 목록 렌더] ================== */
+/* =========================================================================== */
+function visibleItems(){
+    var q = state.search.trim().toLowerCase();
+    var list = state.items.filter(function(it){
+        if(state.filter === 'instock' && (Number(it.qty) || 0) <= 0) return false;
+        if(state.filter === 'sold'    && (Number(it.qty) || 0) >  0) return false;
+        if(q){
+            var hay = ((it.name || '') + ' ' + (it.memo || '')).toLowerCase();
+            if(hay.indexOf(q) < 0) return false;
+        }
+        return true;
+    });
+
+    var by = state.sort;
+    list.sort(function(a, b){
+        switch(by){
+            case 'inDate_asc':     return String(a.inDate || '').localeCompare(String(b.inDate || ''));
+            case 'name_asc':       return String(a.name || '').localeCompare(String(b.name || ''), 'ko');
+            case 'salePrice_desc': return (Number(b.salePrice) || 0) - (Number(a.salePrice) || 0);
+            case 'salePrice_asc':  return (Number(a.salePrice) || 0) - (Number(b.salePrice) || 0);
+            case 'qty_desc':       return (Number(b.qty) || 0) - (Number(a.qty) || 0);
+            case 'margin_desc':    return marginOf(b) - marginOf(a);
+            default:               return String(b.inDate || '').localeCompare(String(a.inDate || ''));
+        }
+    });
+    return list;
+}
+
+function renderList(){
+    var list = visibleItems();
+    var grid = document.getElementById('itemGrid');
+    var empty = document.getElementById('listEmpty');
+
+    document.getElementById('countLabel').textContent =
+        state.items.length ? (num(list.length) + '종 표시 중 (전체 ' + num(state.items.length) + '종)') : '';
+
+    if(!list.length){
+        grid.innerHTML = '';
+        empty.classList.remove('hidden');
+        empty.innerHTML = state.items.length
+            ? '<span class="big">🔍</span>조건에 맞는 제품이 없습니다.<br>검색어나 필터를 바꿔보세요.'
+            : '<span class="big">📭</span>등록된 제품이 없습니다.<br>위의 <b>➕ 제품 등록</b> 탭에서 첫 제품을 올려보세요.';
+        return;
+    }
+    empty.classList.add('hidden');
+
+    grid.innerHTML = list.map(function(it){
+        var qty = Number(it.qty) || 0;
+        var m = marginOf(it);
+        var rate = marginRate(it);
+        var orig = Number(it.originalPrice) || 0;
+        var sale = Number(it.salePrice) || 0;
+        var auc  = Number(it.auctionPrice) || 0;
+
+        var photo = it.thumb
+            ? '<img src="' + esc(it.thumb) + '" alt="' + esc(it.name) + '" loading="lazy">'
+            : '<span class="noimg">📦</span>';
+
+        var subs = [];
+        if(orig) subs.push('<span class="strike">정가 ' + num(orig) + '</span>');
+        if(auc)  subs.push('<span>🔨 ' + num(auc) + '</span>');
+        if(orig && sale && orig > sale){
+            subs.push('<span style="color:var(--danger); font-weight:800">' + Math.round((1 - sale / orig) * 100) + '%↓</span>');
+        }
+
+        return '<div class="item-card" data-id="' + esc(it.id) + '">'
+             +   '<div class="item-photo">' + photo
+             +     '<span class="stock-badge' + (qty <= 0 ? ' out' : '') + '">'
+             +       (qty <= 0 ? '품절' : '재고 ' + num(qty)) + '</span>'
+             +   '</div>'
+             +   '<div class="item-body">'
+             +     '<div class="item-name">' + esc(it.name || '(이름 없음)') + '</div>'
+             +     '<div class="price-main">' + won(sale) + '</div>'
+             +     (subs.length ? '<div class="price-sub">' + subs.join('') + '</div>' : '')
+             +     '<div class="margin-line">'
+             +       '<span style="color:var(--muted)">개당 마진</span>'
+             +       '<span class="' + (m >= 0 ? 'v-plus' : 'v-minus') + '">' + wonSigned(m)
+             +         (rate === null ? '' : ' (' + (rate >= 0 ? '+' : '') + rate.toFixed(0) + '%)') + '</span>'
+             +     '</div>'
+             +     '<div class="item-meta">'
+             +       '<span>📅 ' + esc(shortDate(it.inDate)) + ' 입고</span>'
+             +       '<span>' + (it.memo ? '📝' : '') + '</span>'
+             +     '</div>'
+             +   '</div>'
+             + '</div>';
+    }).join('');
+}
+/* ================== [END: 재고 목록 렌더] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 등록 · 수정 폼] ================== */
+/* =========================================================================== */
+function resetForm(){
+    state.editingId = null;
+    state.photoFull = null;
+    state.photoThumb = null;
+    state.photoTouched = false;
+    document.getElementById('formTitle').textContent = '➕ 새 제품 등록';
+    document.getElementById('formSaveBtn').textContent = '💾 저장하기';
+    ['fName','fSale','fOriginal','fAuction','fQty','fMemo'].forEach(function(id){
+        document.getElementById(id).value = '';
+    });
+    document.getElementById('fQty').value = 1;
+    document.getElementById('fDate').value = todayStr();
+    document.getElementById('fMemo').style.height = 'auto';
+    setPhotoPreview(null);
+    refreshHints();
+}
+
+function setPhotoPreview(dataUrl){
+    var box = document.getElementById('photoPreview');
+    var clearBtn = document.getElementById('photoClearBtn');
+    var sizeEl = document.getElementById('photoSize');
+    if(dataUrl){
+        box.innerHTML = '<img src="' + esc(dataUrl) + '" alt="미리보기">';
+        clearBtn.classList.remove('hidden');
+        var b = dataUrlBytes(state.photoFull || dataUrl);
+        sizeEl.textContent = '📐 저장 용량 약 ' + kb(b) + ' (자동으로 줄였습니다)';
+    }else{
+        box.innerHTML = '<div class="ph"><span class="big">📷</span>제품 사진을 올려주세요<br><span style="font-size:12px">(선택 사항 · 여기로 끌어다 놓아도 됩니다)</span></div>';
+        clearBtn.classList.add('hidden');
+        sizeEl.textContent = '';
+    }
+}
+
+function handlePhotoFile(file){
+    if(!file){ return; }
+    if(!/^image\//.test(file.type)){
+        showToast('이미지 파일만 올릴 수 있습니다.', 'err');
+        return;
+    }
+    showLoading('사진을 줄이는 중…');
+    makePhotoPair(file).then(function(pair){
+        state.photoFull = pair.full;
+        state.photoThumb = pair.thumb;
+        state.photoTouched = true;
+        setPhotoPreview(pair.thumb);
+        hideLoading();
+        showToast('사진을 올렸습니다 📷', 'ok');
+    }).catch(function(e){
+        hideLoading();
+        console.error('[재고관리] 사진 처리 실패', e);
+        showToast('사진을 처리하지 못했습니다: ' + (e.message || e), 'err');
+    });
+}
+
+/** 입력값 아래의 안내 문구 (금액 콤마 · 마진 계산) */
+function refreshHints(){
+    var sale = Number(document.getElementById('fSale').value) || 0;
+    var orig = Number(document.getElementById('fOriginal').value) || 0;
+    var auc  = Number(document.getElementById('fAuction').value) || 0;
+    var qty  = Number(document.getElementById('fQty').value) || 0;
+
+    document.getElementById('hSale').textContent = sale ? won(sale) : '';
+    document.getElementById('hOriginal').textContent =
+        orig ? (won(orig) + (sale && orig > sale ? ' · ' + Math.round((1 - sale / orig) * 100) + '% 할인' : '')) : '';
+
+    var cost = state.costBasis === 'auctionPrice' ? auc : orig;
+    var hA = document.getElementById('hAuction');
+    if(auc){
+        var m = sale - cost;
+        hA.textContent = won(auc) + (sale ? ' · 개당 마진 ' + wonSigned(m) : '');
+        hA.className = 'hint' + (sale && m < 0 ? ' warn' : '');
+    }else{
+        hA.textContent = '';
+        hA.className = 'hint';
+    }
+
+    var hQ = document.getElementById('hQty');
+    if(qty && sale){
+        hQ.textContent = '총 예상매출 ' + won(qty * sale) + ' · 예상수익 ' + wonSigned(qty * (sale - cost));
+    }else{
+        hQ.textContent = '';
+    }
+
+    var name = document.getElementById('fName').value.trim();
+    document.getElementById('hName').textContent = name ? '' : '';
+}
+
+function saveFromForm(){
+    var name = document.getElementById('fName').value.trim();
+    if(!name){
+        showToast('제품 이름을 입력해 주세요.', 'err');
+        document.getElementById('fName').focus();
+        return;
+    }
+    var qtyRaw = document.getElementById('fQty').value;
+    var qty = qtyRaw === '' ? 0 : Number(qtyRaw);
+    if(!(qty >= 0)){
+        showToast('개수는 0 이상이어야 합니다.', 'err');
+        document.getElementById('fQty').focus();
+        return;
+    }
+
+    var editing = state.editingId;
+    var prev = editing ? state.items.find(function(x){ return x.id === editing; }) : null;
+    var id = editing || newId();
+    var now = Date.now();
+
+    var item = {
+        id: id,
+        name: name,
+        salePrice:     Number(document.getElementById('fSale').value) || 0,
+        originalPrice: Number(document.getElementById('fOriginal').value) || 0,
+        auctionPrice:  Number(document.getElementById('fAuction').value) || 0,
+        qty: qty,
+        inDate: document.getElementById('fDate').value || todayStr(),
+        memo: document.getElementById('fMemo').value.trim(),
+        thumb: state.photoTouched ? (state.photoThumb || '') : (prev ? (prev.thumb || '') : ''),
+        hasPhoto: state.photoTouched ? !!state.photoFull : (prev ? !!prev.hasPhoto : false),
+        createdAt: prev ? prev.createdAt : now,
+        updatedAt: now
+    };
+
+    var btn = document.getElementById('formSaveBtn');
+    btn.disabled = true;
+    showLoading('저장하는 중…');
+
+    var chain = Store.saveItem(item);
+
+    // 사진을 새로 골랐을 때만 원본을 다시 쓴다 (지웠으면 원본도 지운다)
+    if(state.photoTouched){
+        chain = chain.then(function(){
+            return state.photoFull ? Store.savePhoto(id, state.photoFull) : Store.deletePhoto(id);
+        });
+    }
+
+    chain.then(function(){
+        if(prev){
+            Object.assign(prev, item);
+        }else{
+            state.items.unshift(item);
+        }
+        hideLoading();
+        btn.disabled = false;
+        showToast(editing ? '수정했습니다 ✏️' : '등록했습니다 📦', 'ok');
+        resetForm();
+        renderStats();
+        renderList();
+        switchTab('list');
+    }).catch(function(e){
+        hideLoading();
+        btn.disabled = false;
+        console.error('[재고관리] 저장 실패', e);
+        showToast('저장하지 못했습니다: ' + (e.message || e), 'err');
+    });
+}
+
+function startEdit(id){
+    var it = state.items.find(function(x){ return x.id === id; });
+    if(!it) return;
+    closeModal();
+    state.editingId = id;
+    state.photoTouched = false;
+    state.photoFull = null;
+    state.photoThumb = it.thumb || null;
+    document.getElementById('formTitle').textContent = '✏️ 제품 수정';
+    document.getElementById('formSaveBtn').textContent = '💾 수정 저장';
+    document.getElementById('fName').value = it.name || '';
+    document.getElementById('fSale').value = it.salePrice || '';
+    document.getElementById('fOriginal').value = it.originalPrice || '';
+    document.getElementById('fAuction').value = it.auctionPrice || '';
+    document.getElementById('fQty').value = Number(it.qty) || 0;
+    document.getElementById('fDate').value = it.inDate || todayStr();
+    document.getElementById('fMemo').value = it.memo || '';
+    setPhotoPreview(it.thumb || null);
+    if(it.thumb) document.getElementById('photoSize').textContent = '📐 등록된 사진이 있습니다 (바꾸려면 새로 고르세요)';
+    refreshHints();
+    autoResize(document.getElementById('fMemo'));
+    switchTab('form');
+    window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+/* ================== [END: 등록 · 수정 폼] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 모달] ================== */
+/* =========================================================================== */
+function openModal(title, bodyHtml, footHtml){
+    var root = document.getElementById('modalRoot');
+    root.innerHTML =
+        '<div class="modal-back" id="modalBack">'
+      +   '<div class="modal">'
+      +     '<div class="modal-head"><h3>' + title + '</h3>'
+      +       '<button class="modal-close" id="modalCloseBtn" aria-label="닫기">✕</button></div>'
+      +     '<div class="modal-body">' + bodyHtml + '</div>'
+      +     (footHtml ? '<div class="modal-foot">' + footHtml + '</div>' : '')
+      +   '</div>'
+      + '</div>';
+    document.body.style.overflow = 'hidden';
+    document.getElementById('modalCloseBtn').onclick = closeModal;
+    document.getElementById('modalBack').onclick = function(e){
+        if(e.target.id === 'modalBack') closeModal();
+    };
+}
+function closeModal(){
+    document.getElementById('modalRoot').innerHTML = '';
+    document.body.style.overflow = '';
+}
+document.addEventListener('keydown', function(e){
+    if(e.key === 'Escape') closeModal();
+});
+
+/* ---------- 제품 상세 ---------- */
+function openDetail(id){
+    var it = state.items.find(function(x){ return x.id === id; });
+    if(!it) return;
+
+    var qty = Number(it.qty) || 0;
+    var sale = Number(it.salePrice) || 0;
+    var orig = Number(it.originalPrice) || 0;
+    var auc  = Number(it.auctionPrice) || 0;
+    var m = marginOf(it);
+    var rate = marginRate(it);
+    var basisName = state.costBasis === 'auctionPrice' ? '경매가격' : '원래가격';
+
+    var sold = state.sales.filter(function(s){ return s.itemId === id; });
+    var soldQty = sold.reduce(function(a, s){ return a + (Number(s.qty) || 0); }, 0);
+    var soldProfit = sold.reduce(function(a, s){
+        return a + (Number(s.qty) || 0) * ((Number(s.unitPrice) || 0) - (Number(s.unitCost) || 0));
+    }, 0);
+
+    var rows = [
+        ['💵 실판매가', won(sale), 'big'],
+        ['🏷️ 원래가격', orig ? won(orig) : '-'],
+        ['🔨 경매가격', auc ? won(auc) : '-'],
+        ['📦 남은 재고', num(qty) + '개'],
+        ['📅 입고날짜', it.inDate || '-'],
+        ['📈 개당 마진', wonSigned(m) + (rate === null ? '' : ' (' + (rate >= 0 ? '+' : '') + rate.toFixed(0) + '%)'), m >= 0 ? 'plus' : 'minus'],
+        ['💰 재고 예상수익', wonSigned(qty * m) + ' · 원가기준 ' + basisName],
+    ];
+    if(sold.length) rows.push(['🏆 누적 판매', num(soldQty) + '개 판매 · 수익 ' + wonSigned(soldProfit), soldProfit >= 0 ? 'plus' : 'minus']);
+    if(it.memo) rows.push(['📝 메모', esc(it.memo)]);
+
+    var body =
+        '<div class="detail-photo" id="detailPhoto">'
+      +   (it.thumb ? '<img src="' + esc(it.thumb) + '" alt="' + esc(it.name) + '">' : '<span class="ph">📦</span>')
+      + '</div>'
+      + rows.map(function(r){
+            var cls = r[2] === 'big' ? ' big' : (r[2] === 'plus' ? ' v-plus' : (r[2] === 'minus' ? ' v-minus' : ''));
+            var val = (r[0] === '📝 메모') ? r[1] : esc(r[1]);   // 메모는 위에서 이미 걸렀다
+            return '<div class="kv"><span class="k">' + esc(r[0]) + '</span>'
+                 + '<span class="v' + cls + '">' + val + '</span></div>';
+        }).join('');
+
+    var foot =
+        '<button class="btn btn-success" id="mdSellBtn"' + (qty <= 0 ? ' disabled' : '') + '>💰 판매 완료</button>'
+      + '<button class="btn btn-info" id="mdEditBtn">✏️ 수정</button>'
+      + '<button class="btn btn-danger" id="mdDelBtn">🗑️ 삭제</button>';
+
+    openModal('📦 ' + esc(it.name || '(이름 없음)'), body, foot);
+
+    document.getElementById('mdEditBtn').onclick = function(){ startEdit(id); };
+    document.getElementById('mdDelBtn').onclick = function(){ removeItem(id); };
+    var sellBtn = document.getElementById('mdSellBtn');
+    if(sellBtn && qty > 0) sellBtn.onclick = function(){ openSell(id); };
+
+    // 원본 사진은 상세를 열었을 때만 읽어 온다 (목록에서는 작은 사진만 쓴다)
+    if(it.hasPhoto){
+        Store.getPhoto(id).then(function(full){
+            var box = document.getElementById('detailPhoto');
+            if(box && full) box.innerHTML = '<img src="' + esc(full) + '" alt="' + esc(it.name) + '">';
+        }).catch(function(e){ console.warn('[재고관리] 원본 사진 불러오기 실패', e); });
+    }
+}
+
+/* ---------- 판매 완료 ---------- */
+function openSell(id){
+    var it = state.items.find(function(x){ return x.id === id; });
+    if(!it) return;
+    var maxQty = Number(it.qty) || 0;
+    var cost = costOf(it);
+
+    var body =
+        '<div class="field" style="margin-bottom:14px">'
+      +   '<label for="sellQty">📦 판매 수량 <span class="opt">(남은 재고 ' + num(maxQty) + '개)</span></label>'
+      +   '<input type="number" id="sellQty" min="1" step="1" inputmode="numeric" value="1" max="' + maxQty + '">'
+      + '</div>'
+      + '<div class="field" style="margin-bottom:14px">'
+      +   '<label for="sellPrice">💵 판매 단가</label>'
+      +   '<input type="number" id="sellPrice" min="0" step="1" inputmode="numeric" value="' + (Number(it.salePrice) || 0) + '">'
+      + '</div>'
+      + '<div class="field" style="margin-bottom:14px">'
+      +   '<label for="sellDate">📅 판매일</label>'
+      +   '<input type="date" id="sellDate" value="' + todayStr() + '">'
+      + '</div>'
+      + '<div class="margin-line" style="font-size:14px; padding:12px 14px">'
+      +   '<span style="color:var(--muted)">이번 판매 수익</span>'
+      +   '<span id="sellProfit" class="v-plus">-</span>'
+      + '</div>'
+      + '<p style="font-size:12.5px; font-weight:600; color:var(--muted); margin:12px 0 0; line-height:1.7">'
+      +   '원가는 <b>' + (state.costBasis === 'auctionPrice' ? '경매가격' : '원래가격') + ' ' + won(cost) + '</b> 로 계산합니다.<br>'
+      +   '저장하면 재고에서 판매 수량만큼 자동으로 빠집니다.'
+      + '</p>';
+
+    var foot = '<button class="btn btn-ghost" id="sellCancel">닫기</button>'
+             + '<button class="btn btn-success" id="sellOk">💰 판매 기록하기</button>';
+
+    openModal('💰 판매 완료 처리', body, foot);
+
+    var qtyEl = document.getElementById('sellQty');
+    var priceEl = document.getElementById('sellPrice');
+    var profitEl = document.getElementById('sellProfit');
+
+    function recalc(){
+        var q = Math.max(0, Number(qtyEl.value) || 0);
+        var p = Number(priceEl.value) || 0;
+        var profit = q * (p - cost);
+        profitEl.textContent = wonSigned(profit) + ' (매출 ' + won(q * p) + ')';
+        profitEl.className = profit >= 0 ? 'v-plus' : 'v-minus';
+    }
+    qtyEl.oninput = recalc;
+    priceEl.oninput = recalc;
+    recalc();
+
+    document.getElementById('sellCancel').onclick = function(){ openDetail(id); };
+    document.getElementById('sellOk').onclick = function(){
+        var q = Number(qtyEl.value) || 0;
+        if(q <= 0){ showToast('판매 수량을 1개 이상 입력해 주세요.', 'err'); return; }
+        if(q > maxQty){ showToast('남은 재고(' + num(maxQty) + '개)보다 많이 팔 수 없습니다.', 'err'); return; }
+        doSell(it, q, Number(priceEl.value) || 0, document.getElementById('sellDate').value || todayStr());
+    };
+}
+
+function doSell(item, qty, unitPrice, soldAt){
+    var sale = {
+        id: newId(),
+        itemId: item.id,
+        itemName: item.name,
+        qty: qty,
+        unitPrice: unitPrice,
+        unitCost: costOf(item),      // 팔던 그 시점의 원가를 굳혀 둔다
+        soldAt: soldAt,
+        createdAt: Date.now()
+    };
+    var nextQty = (Number(item.qty) || 0) - qty;
+
+    showLoading('판매를 기록하는 중…');
+    Store.addSale(sale)
+        .then(function(){
+            return Store.saveItem({ id: item.id, qty: nextQty, updatedAt: Date.now() });
+        })
+        .then(function(){
+            item.qty = nextQty;
+            state.sales.unshift(sale);
+            hideLoading();
+            closeModal();
+            renderStats();
+            renderList();
+            renderSales();
+            showToast(num(qty) + '개 판매 완료! 수익 ' + wonSigned(qty * (unitPrice - sale.unitCost)), 'ok');
+        })
+        .catch(function(e){
+            hideLoading();
+            console.error('[재고관리] 판매 기록 실패', e);
+            showToast('판매를 기록하지 못했습니다: ' + (e.message || e), 'err');
+        });
+}
+
+/* ---------- 삭제 ---------- */
+function removeItem(id){
+    var it = state.items.find(function(x){ return x.id === id; });
+    if(!it) return;
+    if(!confirm('「' + (it.name || '이 제품') + '」 을(를) 삭제할까요?')) return;
+
+    showLoading('삭제하는 중…');
+    Store.deleteItem(id)
+        .then(function(){ return it.hasPhoto ? Store.deletePhoto(id) : null; })
+        .then(function(){
+            state.items = state.items.filter(function(x){ return x.id !== id; });
+            hideLoading();
+            closeModal();
+            renderStats();
+            renderList();
+            showToast('삭제했습니다 🗑️', 'ok');
+        })
+        .catch(function(e){
+            hideLoading();
+            console.error('[재고관리] 삭제 실패', e);
+            showToast('삭제하지 못했습니다: ' + (e.message || e), 'err');
+        });
+}
+/* ================== [END: 모달] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 판매 이력] ================== */
+/* =========================================================================== */
+function renderSales(){
+    var body = document.getElementById('salesBody');
+    var empty = document.getElementById('salesEmpty');
+    var table = document.getElementById('salesTable');
+
+    var list = state.sales.slice().sort(function(a, b){
+        var d = String(b.soldAt || '').localeCompare(String(a.soldAt || ''));
+        return d !== 0 ? d : (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0);
+    });
+
+    if(!list.length){
+        body.innerHTML = '';
+        table.classList.add('hidden');
+        empty.classList.remove('hidden');
+        return;
+    }
+    table.classList.remove('hidden');
+    empty.classList.add('hidden');
+
+    body.innerHTML = list.map(function(s){
+        var q = Number(s.qty) || 0;
+        var revenue = q * (Number(s.unitPrice) || 0);
+        var profit = q * ((Number(s.unitPrice) || 0) - (Number(s.unitCost) || 0));
+        return '<tr>'
+             +   '<td style="white-space:nowrap">' + esc(shortDate(s.soldAt)) + '</td>'
+             +   '<td>' + esc(s.itemName || '(삭제된 제품)') + '</td>'
+             +   '<td class="num">' + num(q) + '개</td>'
+             +   '<td class="num">' + num(s.unitPrice) + '</td>'
+             +   '<td class="num">' + num(revenue) + '</td>'
+             +   '<td class="num ' + (profit >= 0 ? 'v-plus' : 'v-minus') + '" style="font-weight:800">' + wonSigned(profit) + '</td>'
+             +   '<td class="num"><button class="btn btn-ghost btn-sm sale-del" data-id="' + esc(s.id) + '">취소</button></td>'
+             + '</tr>';
+    }).join('');
+}
+
+/** 판매 취소 — 재고를 되돌려 놓는다 */
+function cancelSale(id){
+    var s = state.sales.find(function(x){ return x.id === id; });
+    if(!s) return;
+    if(!confirm('「' + (s.itemName || '이 판매') + '」 기록을 취소하고 재고를 되돌릴까요?')) return;
+
+    var item = state.items.find(function(x){ return x.id === s.itemId; });
+    showLoading('되돌리는 중…');
+    Store.deleteSale(id)
+        .then(function(){
+            if(!item) return null;
+            var nextQty = (Number(item.qty) || 0) + (Number(s.qty) || 0);
+            return Store.saveItem({ id: item.id, qty: nextQty, updatedAt: Date.now() })
+                .then(function(){ item.qty = nextQty; });
+        })
+        .then(function(){
+            state.sales = state.sales.filter(function(x){ return x.id !== id; });
+            hideLoading();
+            renderStats();
+            renderList();
+            renderSales();
+            showToast(item ? '판매를 취소하고 재고를 되돌렸습니다 ↩️' : '판매 기록만 지웠습니다 (제품이 이미 삭제됨)', 'ok');
+        })
+        .catch(function(e){
+            hideLoading();
+            console.error('[재고관리] 판매 취소 실패', e);
+            showToast('취소하지 못했습니다: ' + (e.message || e), 'err');
+        });
+}
+/* ================== [END: 판매 이력] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 탭 전환 · 연결 상태] ================== */
+/* =========================================================================== */
+function switchTab(name){
+    ['list','form','sales','setting'].forEach(function(t){
+        document.getElementById('tab-' + t).classList.toggle('hidden', t !== name);
+    });
+    document.querySelectorAll('.tab-btn').forEach(function(b){
+        b.classList.toggle('active', b.dataset.tab === name);
+    });
+    if(name === 'sales') renderSales();
+}
+
+function renderConn(){
+    var badge = document.getElementById('connBadge');
+    var note = document.getElementById('setupNote');
+    var setting = document.getElementById('settingConn');
+
+    if(Store.mode === 'cloud'){
+        badge.className = 'conn-badge cloud';
+        badge.textContent = '☁️ 클라우드 연결됨';
+        note.classList.add('hidden');
+        setting.innerHTML =
+            '<div style="font-size:15px; font-weight:700; color:#0ca678; line-height:1.9">'
+          +   '☁️ Firebase 에 연결되어 있습니다.<br>'
+          +   '<span style="font-size:13.5px; font-weight:600; color:var(--muted)">'
+          +     '프로젝트: <b>' + esc(firebaseConfig.projectId) + '</b><br>'
+          +     '폰과 PC 어디서 열어도 같은 재고가 보입니다. 다른 기기에서 바꾼 내용은 '
+          +     '오른쪽 위 <b>🔄 새로고침</b> 을 눌러 가져오세요.'
+          +   '</span></div>';
+        return;
+    }
+
+    badge.className = 'conn-badge ' + (Store.error ? 'error' : 'local');
+    badge.textContent = Store.error ? '⚠️ 연결 실패 (로컬 저장 중)' : '💾 로컬 모드';
+
+    note.classList.remove('hidden');
+    if(Store.error){
+        note.innerHTML = '<b>⚠️ 클라우드에 연결하지 못했습니다.</b><br>'
+                       + esc(Store.error) + '<br>'
+                       + '지금은 <b>이 브라우저 안에만</b> 저장됩니다. 자세한 방법은 <b>⚙️ 설정</b> 탭을 보세요.';
+    }else{
+        note.innerHTML = '<b>💾 지금은 로컬 모드입니다.</b> 등록한 재고가 <b>이 브라우저 안에만</b> 저장되어 '
+                       + '폰에서는 보이지 않습니다.<br>'
+                       + '<code>config.js</code> 의 <b>apiKey · messagingSenderId · appId</b> 세 줄만 채우면 '
+                       + '<b>jangggimaster</b> 프로젝트에 연결됩니다 → <b>⚙️ 설정</b> 탭에 순서가 있습니다.';
+    }
+    setting.innerHTML =
+        '<div style="font-size:15px; font-weight:700; color:' + (Store.error ? 'var(--danger)' : '#e8590c') + '; line-height:1.9">'
+      +   (Store.error ? '⚠️ 연결 실패 — ' + esc(Store.error) : '💾 로컬 모드로 동작 중입니다.')
+      +   '<br><span style="font-size:13.5px; font-weight:600; color:var(--muted)">'
+      +     '데이터는 이 브라우저의 저장소(IndexedDB)에 있습니다. 브라우저 데이터를 지우면 함께 사라집니다.'
+      +   '</span></div>';
+}
+/* ================== [END: 탭 전환 · 연결 상태] ================== */
+
+
+/* =========================================================================== */
+/* ================== [START: 부팅] ================== */
+/* =========================================================================== */
+function loadAll(){
+    showLoading('재고를 불러오는 중…');
+    return Promise.all([Store.listItems(), Store.listSales()])
+        .then(function(res){
+            state.items = res[0] || [];
+            state.sales = res[1] || [];
+            // 로컬 모드는 정렬 순서가 없으므로 여기서 맞춘다
+            state.items.sort(function(a, b){ return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
+            state.sales.sort(function(a, b){ return (Number(b.createdAt) || 0) - (Number(a.createdAt) || 0); });
+            hideLoading();
+            renderStats();
+            renderList();
+            renderSales();
+        })
+        .catch(function(e){
+            hideLoading();
+            console.error('[재고관리] 불러오기 실패', e);
+            // 규칙에 막힌 것은 원인이 뻔하므로 무엇을 고쳐야 하는지 바로 알려준다
+            if(e && e.code === 'permission-denied'){
+                showToast('Firestore 규칙에 막혔습니다. 콘솔 → Firestore → 규칙 을 확인하세요.', 'err');
+            }else{
+                showToast('불러오지 못했습니다: ' + (e.message || e), 'err');
+            }
+        });
+}
+
+function bindEvents(){
+    /* 탭 */
+    document.querySelectorAll('.tab-btn').forEach(function(b){
+        b.onclick = function(){
+            // ⚠️ '수정' 중에 [➕ 제품 등록] 탭을 직접 누르면 새 제품을 쓰려는 뜻이다.
+            //    그대로 두면 편집 중이던 제품을 조용히 덮어써 버린다.
+            if(b.dataset.tab === 'form' && state.editingId) resetForm();
+            switchTab(b.dataset.tab);
+        };
+    });
+
+    /* 새로고침 */
+    document.getElementById('refreshBtn').onclick = function(){
+        loadAll().then(function(){ showToast('다시 불러왔습니다 🔄', 'ok'); });
+    };
+
+    /* 검색 · 정렬 · 필터 */
+    document.getElementById('searchInput').oninput = function(e){
+        state.search = e.target.value;
+        renderList();
+    };
+    document.getElementById('sortSelect').onchange = function(e){
+        state.sort = e.target.value;
+        renderList();
+    };
+    document.querySelectorAll('.chip[data-filter]').forEach(function(c){
+        c.onclick = function(){
+            state.filter = c.dataset.filter;
+            document.querySelectorAll('.chip[data-filter]').forEach(function(x){
+                x.classList.toggle('on', x === c);
+            });
+            renderList();
+        };
+    });
+
+    /* 원가 기준 (목록 상단 · 설정 탭 두 곳 모두) */
+    document.querySelectorAll('.chip[data-basis]').forEach(function(c){
+        c.onclick = function(){
+            state.costBasis = c.dataset.basis;
+            localStorage.setItem('inv_costBasis', state.costBasis);
+            syncBasisChips();
+            renderStats();
+            renderList();
+            refreshHints();
+            showToast('원가 기준을 ' + (state.costBasis === 'auctionPrice' ? '경매가격' : '원래가격') + ' 으로 바꿨습니다 📈', 'ok');
+        };
+    });
+
+    /* 제품 카드 클릭 → 상세 */
+    document.getElementById('itemGrid').onclick = function(e){
+        var card = e.target.closest('.item-card');
+        if(card) openDetail(card.dataset.id);
+    };
+
+    /* 판매 이력 취소 버튼 */
+    document.getElementById('salesBody').onclick = function(e){
+        var btn = e.target.closest('.sale-del');
+        if(btn) cancelSale(btn.dataset.id);
+    };
+
+    /* 사진 */
+    var captureInput = document.getElementById('captureInput');
+    var pickInput = document.getElementById('pickInput');
+    document.getElementById('captureBtn').onclick = function(){ captureInput.click(); };
+    document.getElementById('pickBtn').onclick = function(){ pickInput.click(); };
+    captureInput.onchange = function(e){ handlePhotoFile(e.target.files[0]); e.target.value = ''; };
+    pickInput.onchange    = function(e){ handlePhotoFile(e.target.files[0]); e.target.value = ''; };
+    document.getElementById('photoClearBtn').onclick = function(){
+        state.photoFull = null;
+        state.photoThumb = null;
+        state.photoTouched = true;
+        setPhotoPreview(null);
+        showToast('사진을 뺐습니다.', 'ok');
+    };
+    // 카메라 단추는 손가락으로 쓰는 기기에서만 (PC 에서는 그냥 파일창이 떠서 헷갈린다)
+    if(!window.matchMedia || !window.matchMedia('(pointer: coarse)').matches){
+        document.getElementById('captureBtn').classList.add('hidden');
+    }
+
+    /* 사진 끌어다 놓기 */
+    var box = document.getElementById('photoBox');
+    ['dragenter','dragover'].forEach(function(ev){
+        box.addEventListener(ev, function(e){ e.preventDefault(); box.classList.add('drag'); });
+    });
+    ['dragleave','drop'].forEach(function(ev){
+        box.addEventListener(ev, function(e){ e.preventDefault(); box.classList.remove('drag'); });
+    });
+    box.addEventListener('drop', function(e){
+        if(e.dataTransfer && e.dataTransfer.files && e.dataTransfer.files[0]) handlePhotoFile(e.dataTransfer.files[0]);
+    });
+
+    /* 폼 */
+    ['fSale','fOriginal','fAuction','fQty','fName'].forEach(function(id){
+        document.getElementById(id).addEventListener('input', refreshHints);
+    });
+    document.getElementById('fMemo').addEventListener('input', function(e){ autoResize(e.target); });
+    document.getElementById('fName').addEventListener('keydown', function(e){
+        if(e.key === 'Enter' && !e.isComposing){ e.preventDefault(); document.getElementById('fSale').focus(); }
+    });
+    document.getElementById('formSaveBtn').onclick = saveFromForm;
+    document.getElementById('formResetBtn').onclick = function(){
+        resetForm();
+        showToast('폼을 비웠습니다.', 'ok');
+    };
+}
+
+function syncBasisChips(){
+    document.querySelectorAll('.chip[data-basis]').forEach(function(c){
+        c.classList.toggle('on', c.dataset.basis === state.costBasis);
+    });
+}
+
+/** 📱 홈 화면 앱으로 설치되게 하는 서비스워커.
+ *  ⚠️ file:// 로 열었을 때는 등록이 안 된다(브라우저가 막는다) — 그래서 조용히 건너뛴다.
+ *     https 주소에 올렸을 때만 켜진다. */
+function registerSW(){
+    if(!('serviceWorker' in navigator)) return;
+    if(location.protocol !== 'https:' && location.hostname !== 'localhost') return;
+    navigator.serviceWorker.register('sw.js').catch(function(e){
+        console.warn('[재고관리] 서비스워커 등록 실패', e);
+    });
+}
+
+document.addEventListener('DOMContentLoaded', function(){
+    bindEvents();
+    syncBasisChips();
+    resetForm();
+    registerSW();
+    Store.init().then(function(){
+        renderConn();
+        return loadAll();
+    });
+});
+/* ================== [END: 부팅] ================== */
+</script>
+</body>
+</html>
