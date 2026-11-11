@@ -16,7 +16,6 @@
 <link rel="preconnect" href="https://www.gstatic.com" crossorigin>
 <link rel="preconnect" href="https://firestore.googleapis.com" crossorigin>
 <style>
-/* ⚡ 외부 웹폰트(@import) 제거 — 기기 내장 시스템 폰트를 써서 첫 화면이 0.1초 만에 뜹니다 */
 :root{
     --primary:   #ff8e8b;
     --secondary: #e64980;
@@ -41,7 +40,7 @@ body{
 }
 button, input, select, textarea{ font-family: inherit; font-size: inherit; color: inherit; }
 button{ cursor: pointer; }
-.container{ max-width: 1080px; margin: 0 auto; padding: 12px 12px 60px; }
+.container{ max-width: 1080px; margin: 0 auto; padding: 12px 12px 90px; }
 .hidden{ display: none !important; }
 
 /* ================== [헤더 · 가로 반절 & 세로 약 2.5cm 탭] ================== */
@@ -138,7 +137,7 @@ button{ cursor: pointer; }
 .chip.on{ background:var(--secondary); border-color:var(--secondary); color:#fff; }
 .count-label{ font-size:12px; font-weight:700; color:var(--muted); margin-left:auto; }
 
-/* ================== [제품 카드 격자] ================== */
+/* ================== [제품 카드 격자 & 갤러리식 다중 선택] ================== */
 .item-grid{
     display:grid; grid-template-columns:repeat(auto-fill, minmax(220px,1fr)); gap:12px;
 }
@@ -147,16 +146,37 @@ button{ cursor: pointer; }
     background:#fff; border:1px solid var(--line); border-radius:15px;
     box-shadow:var(--card-shadow); overflow:hidden; cursor:pointer;
     display:flex; flex-direction:column; min-width:0;
+    transition: transform .1s, border-color .1s, box-shadow .1s;
     -webkit-touch-callout:none;
     -webkit-user-select:none;
     user-select:none;
 }
-.del-overlay{
-    position:absolute; inset:0; background:rgba(33,37,41,.88);
-    display:none; flex-direction:column; align-items:center; justify-content:center;
-    gap:10px; z-index:25; padding:14px; border-radius:15px; animation:pop .12s ease-out;
+
+/* 갤러리 스타일 체크 배지 & 하단 일괄삭제 바 */
+.sel-check{
+    position:absolute; top:8px; left:8px; width:28px; height:28px;
+    border-radius:50%; border:2.5px solid #fff; background:rgba(0,0,0,.35);
+    color:#fff; font-size:15px; font-weight:900; z-index:25;
+    display:none; align-items:center; justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.25); pointer-events:none;
 }
-.item-card.show-del .del-overlay{ display:flex; }
+body.select-mode .sel-check{ display:flex; }
+body.select-mode .owner-badge{ left:42px; }
+.item-card.selected{
+    border-color:var(--danger);
+    box-shadow:0 0 0 3px rgba(226,75,74,.35);
+    transform:scale(.97);
+}
+.item-card.selected .sel-check{ background:var(--danger); border-color:#fff; }
+.item-card.selected .sel-check::after{ content:'✓'; }
+
+.bulk-bar{
+    position:fixed; left:12px; right:12px; bottom:16px; max-width:560px; margin:0 auto;
+    background:#212529; color:#fff; border-radius:16px; padding:10px 14px;
+    display:flex; align-items:center; gap:8px; z-index:850;
+    box-shadow:0 10px 28px rgba(0,0,0,.35); animation:pop .15s ease-out;
+}
+.bulk-bar .b-cnt{ font-size:14.5px; font-weight:800; flex:1; }
 
 .item-photo{
     position:relative; width:100%; aspect-ratio:4/3; background:#f1f3f5;
@@ -193,7 +213,7 @@ button{ cursor: pointer; }
     display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;
 }
 
-/* ✨ 한 줄로 깔끔하고 예쁘게 보이는 가격 표시줄 */
+/* ✨ 한 줄로 깔끔하게 보이는 가격 표시줄 */
 .price-one-line{
     display:flex; align-items:baseline; justify-content:space-between; gap:6px;
     background:#fff0f6; border:1px solid #ffdeeb; padding:6px 9px; border-radius:9px;
@@ -390,7 +410,7 @@ button{ cursor: pointer; }
         </div>
 
         <div style="font-size:12px; font-weight:700; color:var(--muted); margin:0 0 8px 4px;">
-            💡 카드를 <b>길게 누르면 삭제</b> · <b>남은수량</b>을 누르면 마감 정산됩니다.
+            💡 <b>길게 눌러 드래그</b>하면 여러 개 선택 삭제 · <b>남은수량</b>을 누르면 마감 정산됩니다.
         </div>
 
         <div class="item-grid" id="itemGrid"></div>
@@ -464,6 +484,13 @@ button{ cursor: pointer; }
 
 </main>
 
+<!-- 갤러리 스타일 하단 일괄삭제 바 -->
+<div id="bulkBar" class="bulk-bar hidden">
+    <span class="b-cnt" id="bulkCount">0개 선택됨</span>
+    <button type="button" class="btn btn-ghost btn-sm" id="bulkAllBtn" style="color:#212529">전체선택</button>
+    <button type="button" class="btn btn-ghost btn-sm" id="bulkCancelBtn" style="color:#212529">취소</button>
+    <button type="button" class="btn btn-danger btn-sm" id="bulkDelBtn">🗑️ 삭제</button>
+</div>
 <div id="toastBox"></div>
 <div id="modalRoot"></div>
 <div id="loadingVeil" class="hidden"><div class="spinner"></div><span id="loadingText">처리 중…</span></div>
@@ -518,7 +545,6 @@ function newId(){
 var FAST_CACHE_KEY = 'inv_fast_items_v1';
 function saveFastCache(items){
     try{
-        // 용량이 큰 인라인 사진만 빼고 텍스트 데이터를 즉시 캐싱합니다
         var slim = items.map(function(it){
             var copy = Object.assign({}, it);
             delete copy.thumb;
@@ -706,7 +732,9 @@ var state = {
     photoThumb: null,
     photoTouched: false,
     thumbs: {},
-    thumbBusy: {}
+    thumbBusy: {},
+    selectMode: false,
+    selected: {}
 };
 
 function getCost(it){
@@ -735,7 +763,7 @@ function autoCleanLegacyPhotos(){
     });
 }
 
-/* ================== [목록 렌더링 & 화면에 보이는 사진만 우선 로딩] ================== */
+/* ================== [목록 렌더링 & 사진 지연 로딩] ================== */
 function visibleItems(){
     var q = state.search.trim().toLowerCase();
     var list = state.items.filter(function(it){
@@ -804,7 +832,6 @@ function thumbWatch(){
     }else{
         thumbSeer.disconnect();
     }
-    // 첫 화면 6장만 즉시 요청하고 나머지는 스크롤할 때 받아와 첫 접속 속도를 높입니다
     boxes.forEach(function(b, idx){
         if(idx < 6) thumbFill(b, b.getAttribute('data-thumb'));
         else thumbSeer.observe(b);
@@ -831,18 +858,15 @@ function renderList(){
         var cost = getCost(it);
         var logs = getLogs(it);
         var lastLog = logs.length ? logs[0] : null;
+        var isSel = state.selected && state.selected[it.id];
 
         var cached = state.thumbs[it.id] || it.thumb || '';
         var photo = cached
             ? '<img src="' + esc(cached) + '" alt="">'
             : (it.hasPhoto ? '<span class="ph-slot"></span>' : '<span class="noimg">📦</span>');
 
-        return '<div class="item-card" data-id="' + esc(it.id) + '">'
-             +   '<div class="del-overlay">'
-             +     '<div style="color:#fff; font-weight:800; font-size:14px; text-align:center; word-break:keep-all">' + esc(it.name) + '</div>'
-             +     '<button type="button" class="btn btn-danger btn-sm card-del-confirm" style="width:88%">🗑️ 바로 삭제</button>'
-             +     '<button type="button" class="btn btn-ghost btn-sm card-del-cancel" style="width:88%">취소</button>'
-             +   '</div>'
+        return '<div class="item-card' + (isSel ? ' selected' : '') + '" data-id="' + esc(it.id) + '">'
+             +   '<div class="sel-check"></div>'
              +   '<div class="item-photo"' + (photo.indexOf('ph-slot') > 0 ? ' data-thumb="' + esc(it.id) + '"' : '') + '>'
              +     photo
              +     (it.owner ? '<span class="owner-badge">👤 ' + esc(it.owner) + '</span>' : '')
@@ -1335,7 +1359,6 @@ function renderConn(){
     }
 }
 
-/** ⚡ 로딩 베일로 화면을 가리지 않고, 캐시가 있으면 즉시 그린 뒤 서버 데이터로 조용히 갱신합니다 */
 function loadAll(showSpinner){
     if(showSpinner) showLoading('새로고침 중…');
     return Store.listItems().then(function(items){
@@ -1380,58 +1403,137 @@ function bindEvents(){
         };
     });
 
-    /* 📱 카드: 길게 눌러서 삭제 + 마감정산 + 수량 +/- + 가격변경 */
+    /* 📱 갤러리 스타일: 길게 눌러 드래그 다중 선택 + 일괄 삭제 */
     var gridEl = document.getElementById('itemGrid');
     var pressTimer = null;
-    var longPressed = false;
+    var dragSelecting = false;
+    var dragTargetVal = true;
+    var ignoreNextClick = false;
+    var startX = 0, startY = 0;
+
+    function updateBulkUI(){
+        var ids = Object.keys(state.selected).filter(function(k){ return state.selected[k]; });
+        document.body.classList.toggle('select-mode', state.selectMode);
+        document.getElementById('bulkBar').classList.toggle('hidden', !state.selectMode);
+        document.getElementById('bulkCount').textContent = ids.length + '개 선택됨';
+        gridEl.querySelectorAll('.item-card').forEach(function(c){
+            c.classList.toggle('selected', !!state.selected[c.dataset.id]);
+        });
+    }
+
+    function setCardSelect(id, val){
+        if(!id) return;
+        if(val) state.selected[id] = true;
+        else delete state.selected[id];
+        updateBulkUI();
+    }
+
+    function exitSelectMode(){
+        state.selectMode = false;
+        state.selected = {};
+        dragSelecting = false;
+        updateBulkUI();
+    }
 
     gridEl.addEventListener('touchstart', function(e){
         var card = e.target.closest('.item-card');
         if(!card || e.target.closest('button')) return;
-        longPressed = false;
+        var t = e.touches[0];
+        startX = t.clientX; startY = t.clientY;
+        var id = card.dataset.id;
+
         pressTimer = setTimeout(function(){
-            longPressed = true;
-            gridEl.querySelectorAll('.item-card.show-del').forEach(function(c){ c.classList.remove('show-del'); });
-            card.classList.add('show-del');
+            pressTimer = null;
+            state.selectMode = true;
+            dragSelecting = true;
+            ignoreNextClick = true;
+            dragTargetVal = !state.selected[id];
+            setCardSelect(id, dragTargetVal);
             if(navigator.vibrate) navigator.vibrate(45);
-        }, 500);
+        }, 450);
     }, { passive: true });
 
-    var clearPress = function(){ if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; } };
-    gridEl.addEventListener('touchend', clearPress);
-    gridEl.addEventListener('touchmove', clearPress);
-    gridEl.addEventListener('touchcancel', clearPress);
+    gridEl.addEventListener('touchmove', function(e){
+        var t = e.touches[0];
+        if(pressTimer && (Math.abs(t.clientX - startX) > 12 || Math.abs(t.clientY - startY) > 12)){
+            clearTimeout(pressTimer);
+            pressTimer = null;
+        }
+        if(dragSelecting){
+            e.preventDefault();
+            var el = document.elementFromPoint(t.clientX, t.clientY);
+            var card = el ? el.closest('.item-card') : null;
+            if(card && state.selected[card.dataset.id] !== dragTargetVal){
+                setCardSelect(card.dataset.id, dragTargetVal);
+                if(navigator.vibrate) navigator.vibrate(15);
+            }
+        }
+    }, { passive: false });
+
+    var endTouch = function(){
+        if(pressTimer){ clearTimeout(pressTimer); pressTimer = null; }
+        dragSelecting = false;
+    };
+    gridEl.addEventListener('touchend', endTouch);
+    gridEl.addEventListener('touchcancel', endTouch);
     gridEl.addEventListener('contextmenu', function(e){
         if(e.target.closest('.item-card')) e.preventDefault();
     });
 
+    document.getElementById('bulkCancelBtn').onclick = exitSelectMode;
+    document.getElementById('bulkAllBtn').onclick = function(){
+        var list = visibleItems();
+        var allChecked = list.every(function(it){ return state.selected[it.id]; });
+        list.forEach(function(it){
+            if(allChecked) delete state.selected[it.id];
+            else state.selected[it.id] = true;
+        });
+        updateBulkUI();
+    };
+    document.getElementById('bulkDelBtn').onclick = function(){
+        var ids = Object.keys(state.selected).filter(function(k){ return state.selected[k]; });
+        if(!ids.length){ showToast('선택된 제품이 없습니다.', 'err'); return; }
+        if(!confirm('선택한 ' + ids.length + '개의 제품을 한 번에 삭제할까요?')) return;
+
+        showLoading(ids.length + '개 삭제 중…');
+        Promise.all(ids.map(function(id){
+            var it = state.items.find(function(x){ return x.id === id; });
+            return Store.deleteItem(id)
+                .then(function(){ return (it && it.hasPhoto) ? Store.deletePhoto(id) : null; })
+                .then(function(){ return Store.deleteThumb(id); });
+        })).then(function(){
+            ids.forEach(function(id){ delete state.thumbs[id]; });
+            state.items = state.items.filter(function(x){ return !state.selected[x.id]; });
+            saveFastCache(state.items);
+            hideLoading();
+            exitSelectMode();
+            renderList();
+            showToast(ids.length + '개 삭제 완료 🗑️', 'ok');
+        });
+    };
+
     gridEl.onclick = function(e){
-        if(longPressed){ longPressed = false; return; }
+        if(ignoreNextClick){ ignoreNextClick = false; return; }
         var card = e.target.closest('.item-card');
         if(!card) return;
         var id = card.dataset.id;
+
+        if(state.selectMode){
+            e.stopPropagation();
+            setCardSelect(id, !state.selected[id]);
+            var remain = Object.keys(state.selected).filter(function(k){ return state.selected[k]; }).length;
+            if(remain === 0) exitSelectMode();
+            return;
+        }
+
         var it = state.items.find(function(x){ return x.id === id; });
         if(!it) return;
 
-        if(e.target.closest('.card-del-confirm')){
-            e.stopPropagation();
-            removeItem(id, true);
-            return;
-        }
-        if(e.target.closest('.card-del-cancel') || card.classList.contains('show-del')){
-            e.stopPropagation();
-            card.classList.remove('show-del');
-            return;
-        }
         if(e.target.closest('.card-price-edit')){
-            e.stopPropagation();
-            openPriceModal(id);
-            return;
+            e.stopPropagation(); openPriceModal(id); return;
         }
         if(e.target.closest('.card-qty-settle')){
-            e.stopPropagation();
-            openSettleModal(id);
-            return;
+            e.stopPropagation(); openSettleModal(id); return;
         }
         if(e.target.closest('.card-qty-minus') || e.target.closest('.card-qty-plus')){
             e.stopPropagation();
@@ -1469,14 +1571,12 @@ document.addEventListener('DOMContentLoaded', function(){
     bindEvents();
     resetForm();
 
-    // ⚡ 1단계: 파이어베이스 연결 전에 휴대폰에 기억된 목록부터 0.1초 만에 즉시 화면에 그립니다
     var cached = loadFastCache();
     if(cached && cached.length){
         state.items = cached;
         renderList();
     }
 
-    // ⚡ 2단계: 뒤에서 파이어베이스를 연결하고 최신 데이터와 사진을 조용히 받아옵니다
     Store.init().then(function(){
         renderConn();
         return loadAll(!cached);
